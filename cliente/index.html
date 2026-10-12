@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistema</title>
+</head>
+<body>
+  <h1>Sistema</h1>
+  <p>Hito 1: esqueleto desplegado.</p>
+  <p id="estado">Comprobando la API…</p>
+  <script>
+    // Comprobación mínima de que el backend responde (el cliente de comunicación
+    // real y la interfaz, separados entre sí, llegan en el hito 2).
+    fetch("/api/salud")
+      .then((r) => r.json())
+      .then((d) => { document.getElementById("estado").textContent = d.ok ? "API operativa" : "API con problemas"; })
+      .catch(() => { document.getElementById("estado").textContent = "No se pudo contactar con la API"; });
+  </script>
+</body>
+</html>
