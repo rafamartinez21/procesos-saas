@@ -6,6 +6,7 @@
 
 const express = require("express");
 const path = require("path");
+const { crearRegistro } = require("./registro.js");
 const { Sesiones, leerCookie, cookieDeSesion, cookieBorrada, NOMBRE_COOKIE } = require("./sesiones.js");
 
 // Cada código de error de negocio se traduce a un estado HTTP.
@@ -20,7 +21,7 @@ const ESTADO_HTTP = {
   EMAIL_EN_USO: 409,
 };
 
-function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
+function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro() } = {}) {
   const app = express();
 
   // Cloud Run está detrás de un proxy que termina el HTTPS. Con esto, req.secure es
@@ -40,9 +41,26 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
     }, next);
   });
 
+  // Log de cada petición a la API cuando termina: método, ruta, estado HTTP, duración y
+  // quién la hizo (si había sesión). Los ficheros estáticos no se registran.
+  app.use("/api", (req, res, next) => {
+    const inicio = Date.now();
+    res.on("finish", () => {
+      registro.info("peticion", {
+        metodo: req.method,
+        ruta: req.originalUrl,
+        estado: res.statusCode,
+        ms: Date.now() - inicio,
+        usuario: req.emailSesion,
+      });
+    });
+    next();
+  });
+
   // Protege una ruta: rechaza con 401 las peticiones sin sesión válida.
   function exigirSesion(req, res, next) {
     if (!req.emailSesion) {
+      registro.aviso("peticion sin sesion", { metodo: req.method, ruta: req.originalUrl });
       return res.status(401).json({ error: "NO_AUTENTICADO", mensaje: "Debes iniciar sesión" });
     }
     next();
@@ -60,6 +78,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   // Registro de usuario
   app.post("/api/usuarios", asincrono(async (req, res) => {
     const usuario = await sistema.registrarUsuario(req.body);
+    registro.info("usuario registrado", { email: usuario.email, estado: usuario.estado });
     res.status(201).json(usuario);
   }));
 
@@ -69,6 +88,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
     // Se cierra cualquier sesión anterior de este navegador y se crea una nueva.
     await sesiones.destruir(req.idSesion);
     const id = await sesiones.crear(usuario.email);
+    registro.info("inicio de sesion", { email: usuario.email, rol: usuario.rol });
     res.setHeader("Set-Cookie", cookieDeSesion(id, { segura: req.secure, duracionMs: sesiones.duracionMs }));
     res.json(usuario);
   }));
@@ -92,6 +112,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   // Cerrar sesión: se invalida en el servidor y se borra la cookie.
   app.delete("/api/sesion", exigirSesion, asincrono(async (req, res) => {
     await sesiones.destruir(req.idSesion);
+    registro.info("cierre de sesion", { email: req.emailSesion });
     res.setHeader("Set-Cookie", cookieBorrada({ segura: req.secure }));
     res.status(204).end();
   }));
@@ -107,6 +128,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
 
   app.delete("/api/usuarios/:email", exigirSesion, asincrono(async (req, res) => {
     await sistema.eliminarUsuario(req.emailSesion, req.params.email);
+    registro.info("usuario eliminado", { email: req.params.email.trim().toLowerCase(), por: req.emailSesion });
     // Un usuario eliminado no puede seguir usando sus sesiones.
     await sesiones.destruirDeUsuario(req.params.email.trim().toLowerCase());
     if (req.emailSesion === req.params.email.trim().toLowerCase()) {
@@ -124,12 +146,20 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
     if (err && err.name === "ErrorNegocio") {
+      // Rechazos esperados (login fallido, acceso denegado...): aviso, con quién y dónde.
+      registro.aviso("peticion rechazada", {
+        codigo: err.codigo,
+        metodo: req.method,
+        ruta: req.originalUrl,
+        usuario: req.emailSesion,
+        email: req.body && typeof req.body.email === "string" ? req.body.email : undefined,
+      });
       return res.status(ESTADO_HTTP[err.codigo] || 400).json({ error: err.codigo, mensaje: err.message });
     }
     if (err && err.type === "entity.parse.failed") {
       return res.status(400).json({ error: "JSON_INVALIDO", mensaje: "El cuerpo de la petición no es JSON válido" });
     }
-    console.error("Error inesperado:", err);
+    registro.error("error inesperado", { metodo: req.method, ruta: req.originalUrl, error: String(err && err.stack || err) });
     res.status(500).json({ error: "ERROR_INTERNO", mensaje: "Ha ocurrido un error inesperado" });
   });
 

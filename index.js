@@ -9,8 +9,11 @@ const { Sistema } = require("./servidor/modelo.js");
 const { crearApp } = require("./servidor/api.js");
 const { Sesiones } = require("./servidor/sesiones.js");
 const { SesionesMongo } = require("./servidor/sesiones-mongo.js");
+const { crearRegistro } = require("./servidor/registro.js");
 
 const PORT = process.env.PORT || 3000;
+
+const registro = crearRegistro();
 
 async function main() {
   // Con DATABASE_URL se usa MongoDB (los datos sobreviven a reinicios). Sin ella, memoria
@@ -23,11 +26,11 @@ async function main() {
     await cad.conectar();
     sesiones = new SesionesMongo(cad.bd.collection("sesiones"));
     await sesiones.prepararIndices();
-    console.log("Conectado a la base de datos");
+    registro.info("conectado a la base de datos");
   } else {
     cad = new CadMemoria();
     sesiones = new Sesiones();
-    console.warn("DATABASE_URL no definida: los datos se guardan en memoria y se pierden al reiniciar");
+    registro.aviso("DATABASE_URL no definida: los datos se guardan en memoria y se pierden al reiniciar");
   }
   // AUTO_CONFIRMAR=true: PROVISIONAL hasta el hito 4 (confirmación por correo).
   const sistema = new Sistema(cad, { autoConfirmar: process.env.AUTO_CONFIRMAR === "true" });
@@ -39,18 +42,18 @@ async function main() {
       email: process.env.ADMIN_EMAIL,
       password: process.env.ADMIN_PASSWORD,
     });
-    console.log("Administrador inicial preparado");
+    registro.info("administrador inicial preparado", { email: process.env.ADMIN_EMAIL });
   } else {
-    console.warn("ADMIN_EMAIL y ADMIN_PASSWORD no definidas: no hay administrador");
+    registro.aviso("ADMIN_EMAIL y ADMIN_PASSWORD no definidas: no hay administrador");
   }
 
-  const app = crearApp(sistema, { sesiones });
+  const app = crearApp(sistema, { sesiones, registro });
   app.listen(PORT, () => {
-    console.log(`App escuchando en el puerto ${PORT}`);
+    registro.info("servidor arrancado", { puerto: Number(PORT) });
   });
 }
 
 main().catch((err) => {
-  console.error("No se pudo arrancar:", err);
+  registro.error("no se pudo arrancar", { error: String(err && err.stack || err) });
   process.exit(1);
 });
