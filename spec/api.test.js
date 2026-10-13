@@ -8,6 +8,7 @@ const assert = require("node:assert/strict");
 const { Sistema } = require("../servidor/modelo.js");
 const { CadMemoria } = require("../servidor/cad-memoria.js");
 const { crearApp } = require("../servidor/api.js");
+const { registroSilencioso } = require("../servidor/registro.js");
 
 const CLAVE = "claveSegura1";
 let servidor;
@@ -16,7 +17,7 @@ let base;
 before(async () => {
   const sistema = new Sistema(new CadMemoria(), { autoConfirmar: true });
   await sistema.crearAdministradorInicial({ email: "admin@test.es", password: "claveAdmin1" });
-  const app = crearApp(sistema);
+  const app = crearApp(sistema, { registro: registroSilencioso });
   await new Promise((resolve) => {
     servidor = app.listen(0, resolve);
   });
