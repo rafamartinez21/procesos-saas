@@ -1,54 +1,97 @@
-// Pruebas del módulo de sesiones (servidor/sesiones.js). No necesitan servidor web.
+// Pruebas del módulo de sesiones. Las mismas pruebas se ejecutan contra las sesiones
+// en memoria (sesiones.js) y contra las de MongoDB (sesiones-mongo.js), esta última
+// con un MongoDB temporal (mongodb-memory-server), sin conectarse a Atlas.
 
-const { test } = require("node:test");
+const { describe, test, before, after } = require("node:test");
 const assert = require("node:assert/strict");
+const { MongoClient } = require("mongodb");
+const { MongoMemoryServer } = require("mongodb-memory-server");
 const { Sesiones, leerCookie, cookieDeSesion, cookieBorrada } = require("../servidor/sesiones.js");
+const { SesionesMongo } = require("../servidor/sesiones-mongo.js");
 
-test("una sesión creada permite recuperar al usuario", () => {
-  const s = new Sesiones();
-  const id = s.crear("pepe@test.es");
-  assert.equal(s.obtener(id), "pepe@test.es");
+// "crearSesiones(opciones)" devuelve un almacén de sesiones vacío.
+function pruebasDeSesiones(crearSesiones) {
+  test("una sesión creada permite recuperar al usuario", async () => {
+    const s = await crearSesiones();
+    const id = await s.crear("pepe@test.es");
+    assert.equal(await s.obtener(id), "pepe@test.es");
+  });
+
+  test("cada sesión tiene un identificador distinto y largo", async () => {
+    const s = await crearSesiones();
+    const a = await s.crear("pepe@test.es");
+    const b = await s.crear("pepe@test.es");
+    assert.notEqual(a, b);
+    assert.ok(a.length >= 64);
+  });
+
+  test("[error] un identificador desconocido o vacío no da sesión", async () => {
+    const s = await crearSesiones();
+    assert.equal(await s.obtener("inventado"), undefined);
+    assert.equal(await s.obtener(undefined), undefined);
+  });
+
+  test("cerrar sesión invalida el identificador", async () => {
+    const s = await crearSesiones();
+    const id = await s.crear("pepe@test.es");
+    await s.destruir(id);
+    assert.equal(await s.obtener(id), undefined);
+  });
+
+  test("[error] una sesión caducada deja de valer", async () => {
+    let ahora = 1000;
+    const s = await crearSesiones({ duracionMs: 500, ahora: () => ahora });
+    const id = await s.crear("pepe@test.es");
+    assert.equal(await s.obtener(id), "pepe@test.es");
+    ahora = 1600;
+    assert.equal(await s.obtener(id), undefined);
+  });
+
+  test("destruirDeUsuario cierra todas las sesiones de ese usuario y solo las suyas", async () => {
+    const s = await crearSesiones();
+    const a1 = await s.crear("pepe@test.es");
+    const a2 = await s.crear("pepe@test.es");
+    const b = await s.crear("luis@test.es");
+    await s.destruirDeUsuario("pepe@test.es");
+    assert.equal(await s.obtener(a1), undefined);
+    assert.equal(await s.obtener(a2), undefined);
+    assert.equal(await s.obtener(b), "luis@test.es");
+  });
+}
+
+describe("Sesiones en memoria", () => {
+  pruebasDeSesiones(async (opciones) => new Sesiones(opciones));
 });
 
-test("cada sesión tiene un identificador distinto y largo", () => {
-  const s = new Sesiones();
-  const a = s.crear("pepe@test.es");
-  const b = s.crear("pepe@test.es");
-  assert.notEqual(a, b);
-  assert.ok(a.length >= 64);
-});
+describe("Sesiones en MongoDB", () => {
+  let servidorMongo;
+  let cliente;
+  let coleccion;
 
-test("[error] un identificador desconocido o vacío no da sesión", () => {
-  const s = new Sesiones();
-  assert.equal(s.obtener("inventado"), undefined);
-  assert.equal(s.obtener(undefined), undefined);
-});
+  before(async () => {
+    servidorMongo = await MongoMemoryServer.create();
+    cliente = new MongoClient(servidorMongo.getUri());
+    await cliente.connect();
+    coleccion = cliente.db("pruebas").collection("sesiones");
+  });
 
-test("cerrar sesión invalida el identificador", () => {
-  const s = new Sesiones();
-  const id = s.crear("pepe@test.es");
-  s.destruir(id);
-  assert.equal(s.obtener(id), undefined);
-});
+  after(async () => {
+    await cliente.close();
+    await servidorMongo.stop();
+  });
 
-test("[error] una sesión caducada deja de valer", () => {
-  let ahora = 1000;
-  const s = new Sesiones({ duracionMs: 500, ahora: () => ahora });
-  const id = s.crear("pepe@test.es");
-  assert.equal(s.obtener(id), "pepe@test.es");
-  ahora = 1600;
-  assert.equal(s.obtener(id), undefined);
-});
+  pruebasDeSesiones(async (opciones) => {
+    await coleccion.deleteMany({});
+    const s = new SesionesMongo(coleccion, opciones);
+    await s.prepararIndices();
+    return s;
+  });
 
-test("destruirDeUsuario cierra todas las sesiones de ese usuario y solo las suyas", () => {
-  const s = new Sesiones();
-  const a1 = s.crear("pepe@test.es");
-  const a2 = s.crear("pepe@test.es");
-  const b = s.crear("luis@test.es");
-  s.destruirDeUsuario("pepe@test.es");
-  assert.equal(s.obtener(a1), undefined);
-  assert.equal(s.obtener(a2), undefined);
-  assert.equal(s.obtener(b), "luis@test.es");
+  test("una sesión sigue valiendo con otra instancia (como tras un reinicio)", async () => {
+    await coleccion.deleteMany({});
+    const id = await new SesionesMongo(coleccion).crear("pepe@test.es");
+    assert.equal(await new SesionesMongo(coleccion).obtener(id), "pepe@test.es");
+  });
 });
 
 test("leerCookie extrae el valor correcto entre varias cookies", () => {

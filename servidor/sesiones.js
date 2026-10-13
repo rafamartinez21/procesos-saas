@@ -10,13 +10,18 @@
 //  4. Cerrar sesión borra la entrada del servidor: aunque alguien conservara la
 //     cookie, ya no vale.
 // Como la sesión vive en el servidor, se mantiene al recargar la página (el navegador
-// conserva la cookie), pero se pierde si el servidor se reinicia. Es lo esperado mientras
-// los datos están en memoria.
+// conserva la cookie). Esta versión guarda las sesiones en memoria (se pierden al
+// reiniciar); sesiones-mongo.js tiene la MISMA interfaz y las guarda en la base de datos.
+// Todos los métodos son async para que la API pueda usar cualquiera de las dos.
 
 const crypto = require("node:crypto");
 
 const NOMBRE_COOKIE = "sid";
 const DURACION_POR_DEFECTO_MS = 7 * 24 * 60 * 60 * 1000; // 7 días
+
+function generarId() {
+  return crypto.randomBytes(32).toString("hex");
+}
 
 function Sesiones({ duracionMs = DURACION_POR_DEFECTO_MS, ahora = () => Date.now() } = {}) {
   this.duracionMs = duracionMs;
@@ -24,14 +29,14 @@ function Sesiones({ duracionMs = DURACION_POR_DEFECTO_MS, ahora = () => Date.now
   this.sesiones = new Map(); // id -> { email, caduca }
 
   // Siempre se genera un identificador nuevo (evita la "fijación de sesión").
-  this.crear = function (email) {
-    const id = crypto.randomBytes(32).toString("hex");
+  this.crear = async function (email) {
+    const id = generarId();
     this.sesiones.set(id, { email, caduca: this.ahora() + this.duracionMs });
     return id;
   };
 
   // Devuelve el email de la sesión, o undefined si no existe o ha caducado.
-  this.obtener = function (id) {
+  this.obtener = async function (id) {
     const s = id ? this.sesiones.get(id) : undefined;
     if (!s) return undefined;
     if (s.caduca <= this.ahora()) {
@@ -41,12 +46,12 @@ function Sesiones({ duracionMs = DURACION_POR_DEFECTO_MS, ahora = () => Date.now
     return s.email;
   };
 
-  this.destruir = function (id) {
+  this.destruir = async function (id) {
     this.sesiones.delete(id);
   };
 
   // Para cuando se elimina un usuario: se cierran todas sus sesiones.
-  this.destruirDeUsuario = function (email) {
+  this.destruirDeUsuario = async function (email) {
     for (const [id, s] of this.sesiones) {
       if (s.email === email) this.sesiones.delete(id);
     }
@@ -81,4 +86,4 @@ function cookieBorrada({ segura = false } = {}) {
   return partes.join("; ");
 }
 
-module.exports = { Sesiones, leerCookie, cookieDeSesion, cookieBorrada, NOMBRE_COOKIE };
+module.exports = { Sesiones, generarId, DURACION_POR_DEFECTO_MS, leerCookie, cookieDeSesion, cookieBorrada, NOMBRE_COOKIE };
