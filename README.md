@@ -2,7 +2,7 @@
 
 Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 
-**Estado:** hito 2 (frontend separado en interfaz y cliente de comunicación; registro e inicio de sesión locales con contraseña con hash; sesión que se mantiene al recargar; rutas protegidas). Los datos siguen en memoria.
+**Estado:** hito 3 (persistencia en MongoDB Atlas para usuarios y sesiones; secretos en variables de entorno; roles usuario/administrador aplicados en el servidor; registro de actividad). Incluye lo de los hitos 1 y 2: frontend separado en interfaz y cliente de comunicación, registro e inicio de sesión locales con contraseña con hash, sesión que se mantiene al recargar y rutas protegidas.
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
@@ -17,9 +17,12 @@ Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 | JavaScript nativo (módulos ES) en el cliente | Interfaz y cliente de comunicación son dos módulos separados sin necesidad de un framework. |
 | `node:test` (incluido en Node) | Framework de pruebas integrado: no añade dependencias y se ejecuta con un único comando. |
 | GitHub Actions | CI integrada en el repositorio, sin servicios externos. |
+| MongoDB Atlas (driver `mongodb`) | Base de datos real con capa gratuita (M0) en Google Cloud, en la misma región que Cloud Run; el modelo de documentos encaja con un usuario por documento y los índices únicos evitan emails duplicados. |
+| Registro JSON por la salida estándar | Cloud Run lo envía a Cloud Logging, que filtra por nivel (`severity`) sin añadir librerías. |
+| `mongodb-memory-server` (solo pruebas) | MongoDB temporal en local: las pruebas del CAD y de las sesiones usan una base de datos de verdad sin tocar Atlas ni necesitar secretos. |
 | Google Cloud Run | Despliegue sencillo desde el repositorio, con capa gratuita y URL pública con HTTPS. |
 
-_(Se irán añadiendo la base de datos, OAuth y el correo con su justificación.)_
+_(Se irán añadiendo OAuth y el correo con su justificación.)_
 
 ## Arquitectura
 
@@ -31,15 +34,18 @@ cliente/                  Frontend (se sirve desde el mismo origen que la API)
   estilos.css
 servidor/
   api.js                  Capa API: HTTP <-> lógica. Cookies de sesión y rutas protegidas. Sin reglas de negocio.
-  sesiones.js             Sesiones (identificador -> usuario) y cookies. Parte de la capa API.
+  sesiones.js             Sesiones (identificador -> usuario) en memoria, y cookies. Parte de la capa API.
+  sesiones-mongo.js       Mismas sesiones, guardadas en MongoDB (caducan solas con un índice TTL).
+  registro.js             Log de actividad en JSON (sin contraseñas, hashes ni cookies).
   modelo.js               Capa de lógica de negocio: reglas de usuarios y roles. Sin HTTP ni datos.
   contrasenas.js          Hash y verificación de contraseñas (scrypt).
-  cad-memoria.js          Capa de acceso a datos (en memoria). En el hito 3 se añade una versión con base de datos.
+  cad-memoria.js          Capa de acceso a datos en memoria (desarrollo y pruebas).
+  cad-mongo.js            Capa de acceso a datos en MongoDB. Misma interfaz que cad-memoria.js.
 index.js                  Ensambla las capas y arranca el servidor.
 spec/                     Pruebas automatizadas.
 ```
 
-Flujo de una petición: `interfaz.js` → `cliente-api.js` → (HTTP) → `api.js` → `modelo.js` → `cad-*.js`. Cada capa solo conoce a la de debajo. La lógica recibe el CAD por parámetro (`new Sistema(cad)`), por eso cambiar de memoria a base de datos no obliga a tocarla.
+Flujo de una petición: `interfaz.js` → `cliente-api.js` → (HTTP) → `api.js` → `modelo.js` → `cad-*.js`. Cada capa solo conoce a la de debajo. La lógica recibe el CAD por parámetro (`new Sistema(cad)`), por eso pasar de memoria a base de datos en el hito 3 no ha tocado `modelo.js`: `index.js` elige `CadMongo` si existe `DATABASE_URL` y `CadMemoria` si no.
 
 ## Ejecutar en local
 
@@ -58,6 +64,8 @@ $env:AUTO_CONFIRMAR="true"
 npm start
 ```
 
+Sin `DATABASE_URL`, los datos se guardan en memoria (se pierden al reiniciar). Para usar MongoDB en local, añade `DATABASE_URL` en un `.env` y arranca con `node --env-file=.env index.js`.
+
 Abre http://localhost:3000.
 
 ## Ejecutar las pruebas
@@ -66,13 +74,14 @@ Abre http://localhost:3000.
 npm test
 ```
 
-Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de las sesiones y de la API (rutas protegidas).
+Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de la capa de acceso a datos y de las sesiones (en memoria y en MongoDB con una base de datos temporal), de la API (rutas protegidas) y del registro. No necesitan red ni secretos.
 
 ## Variables de entorno
 
 Solo nombres; los valores van en el entorno o en un `.env` local (no se sube al repositorio). Ver `.env.example`.
 
 - `PORT`
+- `DATABASE_URL`: cadena de conexión de MongoDB Atlas. Es un secreto: en Cloud Run va como variable de entorno del servicio, nunca en el repositorio.
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: administrador inicial (se crea al arrancar si no existe).
 - `AUTO_CONFIRMAR`: provisional hasta el hito 4 (confirmación por correo). Con `true`, las cuentas nuevas quedan confirmadas al registrarse.
 
@@ -89,10 +98,15 @@ El primer administrador se crea al arrancar el servidor con `ADMIN_EMAIL` y `ADM
 - La interfaz inserta los datos de usuarios con `textContent`, no con `innerHTML`.
 - El inicio de sesión devuelve el mismo error para «usuario inexistente» y «contraseña incorrecta».
 
-## Limitaciones conocidas (hito 2)
+## Roles y registro de actividad
 
-- Con los datos y las sesiones en memoria, se pierden al reiniciar el servidor y solo funcionan con una instancia (en Cloud Run: máximo de instancias = 1). El hito 3 introduce la base de datos.
-- La confirmación por correo y OAuth llegan en el hito 4.
+- Dos roles: `usuario` y `admin`. Listar usuarios y comprobar si uno está activo es solo del administrador; eliminar: el administrador a cualquiera y un usuario solo a sí mismo. Se comprueba en el servidor (`modelo.js`) y el rol se lee siempre de la base de datos, nunca de lo que envíe el cliente.
+- El log escribe una línea JSON por evento (arranque, peticiones, altas, inicios y cierres de sesión, eliminaciones, rechazos y errores inesperados). Se consulta en Cloud Logging, en los registros del servicio de Cloud Run.
+
+## Limitaciones conocidas (hito 3)
+
+- Cada petición a la API busca la sesión en la base de datos; es suficiente para este proyecto.
+- La confirmación por correo y OAuth llegan en el hito 4; hasta entonces `AUTO_CONFIRMAR=true` deja las cuentas confirmadas al registrarse.
 
 ## Flujo de trabajo
 
