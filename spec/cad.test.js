@@ -69,6 +69,20 @@ function pruebasDeContrato(crearCad) {
     assert.equal(await cad.eliminarUsuario("pepe@test.es"), false);
   });
 
+  test("buscarUsuarioPorToken encuentra al usuario por el hash de su token", async () => {
+    await cad.insertarUsuario(usuario("pepe@test.es", { tokenConfirmacion: "hash-token-1", tokenCaduca: 123 }));
+    await cad.insertarUsuario(usuario("otro@test.es", { tokenConfirmacion: "hash-token-2", tokenCaduca: 123 }));
+    assert.equal((await cad.buscarUsuarioPorToken("hash-token-1")).email, "pepe@test.es");
+    assert.equal(await cad.buscarUsuarioPorToken("no-existe"), undefined);
+    assert.equal(await cad.buscarUsuarioPorToken(null), undefined);
+  });
+
+  test("al borrar el token con actualizarUsuario deja de encontrarse", async () => {
+    await cad.insertarUsuario(usuario("pepe@test.es", { tokenConfirmacion: "hash-token-1", tokenCaduca: 123 }));
+    await cad.actualizarUsuario("pepe@test.es", { confirmada: true, tokenConfirmacion: null, tokenCaduca: null });
+    assert.equal(await cad.buscarUsuarioPorToken("hash-token-1"), undefined);
+  });
+
   test("modificar el objeto devuelto no cambia lo guardado", async () => {
     await cad.insertarUsuario(usuario("pepe@test.es"));
     const u = await cad.buscarUsuario("pepe@test.es");
