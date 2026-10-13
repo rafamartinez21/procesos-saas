@@ -73,7 +73,7 @@ Abre http://localhost:3000.
 npm test
 ```
 
-Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de la capa de acceso a datos y de las sesiones (en memoria y en MongoDB con una base de datos temporal), de la API (rutas protegidas) y del registro. No necesitan red ni secretos.
+Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de la capa de acceso a datos y de las sesiones (en memoria y en MongoDB con una base de datos temporal), de la confirmación de cuenta (token válido, inventado, caducado y reutilizado), de la API (rutas protegidas) y del registro de actividad. No necesitan red ni secretos.
 
 ## Variables de entorno
 

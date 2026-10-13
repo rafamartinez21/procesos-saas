@@ -13,6 +13,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Cuando tengas package-lock.json commiteado, puedes cambiar esto por "npm ci".
-      - run: npm install
+      # npm ci instala exactamente las versiones de package-lock.json (instalación reproducible).
+      - run: npm ci
       - run: npm test
