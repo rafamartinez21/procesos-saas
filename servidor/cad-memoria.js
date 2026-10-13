@@ -3,7 +3,8 @@
 // con la MISMA interfaz (mismos métodos) contra una base de datos real.
 //
 // Interfaz que debe cumplir cualquier CAD:
-//   insertarUsuario(usuario)            -> usuario
+//   insertarUsuario(usuario)            -> usuario. Lanza un error con codigo "DUPLICADO"
+//                                          si ya existe ese email (como haría un índice único).
 //   buscarUsuario(email)                -> usuario | undefined
 //   listarUsuarios()                    -> [usuario]
 //   actualizarUsuario(email, cambios)   -> usuario | undefined
@@ -16,6 +17,9 @@ function CadMemoria() {
   // Se guardan y devuelven copias para que la lógica no pueda modificar el almacén
   // sin pasar por estos métodos (igual que pasaría con una base de datos).
   this.insertarUsuario = async function (usuario) {
+    if (this.usuarios.has(usuario.email)) {
+      throw Object.assign(new Error("Ya existe un usuario con ese email"), { codigo: "DUPLICADO" });
+    }
     this.usuarios.set(usuario.email, { ...usuario });
     return { ...usuario };
   };
