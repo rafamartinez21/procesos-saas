@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sistema</title>
+  <link rel="stylesheet" href="estilos.css">
+  <link rel="icon" href="data:,">
 </head>
 <body>
-  <h1>Sistema</h1>
-  <p>Hito 1: esqueleto desplegado.</p>
-  <p id="estado">Comprobando la API…</p>
-  <script>
-    // Comprobación mínima de que el backend responde (el cliente de comunicación
-    // real y la interfaz, separados entre sí, llegan en el hito 2).
-    fetch("/api/salud")
-      .then((r) => r.json())
-      .then((d) => { document.getElementById("estado").textContent = d.ok ? "API operativa" : "API con problemas"; })
-      .catch(() => { document.getElementById("estado").textContent = "No se pudo contactar con la API"; });
-  </script>
+  <header>
+    <h1>Sistema</h1>
+  </header>
+  <main>
+    <p id="mensaje" class="mensaje" role="status" hidden></p>
+    <div id="app"><p>Cargando…</p></div>
+  </main>
+  <!-- La interfaz importa el cliente de comunicación; son dos archivos distintos -->
+  <script type="module" src="interfaz.js"></script>
 </body>
 </html>
