@@ -7,19 +7,26 @@ const { CadMemoria } = require("./servidor/cad-memoria.js");
 const { CadMongo } = require("./servidor/cad-mongo.js");
 const { Sistema } = require("./servidor/modelo.js");
 const { crearApp } = require("./servidor/api.js");
+const { Sesiones } = require("./servidor/sesiones.js");
+const { SesionesMongo } = require("./servidor/sesiones-mongo.js");
 
 const PORT = process.env.PORT || 3000;
 
 async function main() {
   // Con DATABASE_URL se usa MongoDB (los datos sobreviven a reinicios). Sin ella, memoria
   // (solo para desarrollo local rápido). La cadena de conexión NUNCA va en el código.
+  // Las sesiones van a la misma base de datos, así sobreviven a reinicios y despliegues.
   let cad;
+  let sesiones;
   if (process.env.DATABASE_URL) {
     cad = new CadMongo(process.env.DATABASE_URL);
     await cad.conectar();
+    sesiones = new SesionesMongo(cad.bd.collection("sesiones"));
+    await sesiones.prepararIndices();
     console.log("Conectado a la base de datos");
   } else {
     cad = new CadMemoria();
+    sesiones = new Sesiones();
     console.warn("DATABASE_URL no definida: los datos se guardan en memoria y se pierden al reiniciar");
   }
   // AUTO_CONFIRMAR=true: PROVISIONAL hasta el hito 4 (confirmación por correo).
@@ -37,7 +44,7 @@ async function main() {
     console.warn("ADMIN_EMAIL y ADMIN_PASSWORD no definidas: no hay administrador");
   }
 
-  const app = crearApp(sistema);
+  const app = crearApp(sistema, { sesiones });
   app.listen(PORT, () => {
     console.log(`App escuchando en el puerto ${PORT}`);
   });

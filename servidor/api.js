@@ -34,8 +34,10 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   // Lee la cookie de sesión y deja en req.idSesion / req.emailSesion quién es (si hay sesión válida).
   app.use((req, res, next) => {
     req.idSesion = leerCookie(req.get("cookie"), NOMBRE_COOKIE);
-    req.emailSesion = sesiones.obtener(req.idSesion);
-    next();
+    sesiones.obtener(req.idSesion).then((email) => {
+      req.emailSesion = email;
+      next();
+    }, next);
   });
 
   // Protege una ruta: rechaza con 401 las peticiones sin sesión válida.
@@ -65,8 +67,8 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   app.post("/api/sesion", asincrono(async (req, res) => {
     const usuario = await sistema.iniciarSesion(req.body);
     // Se cierra cualquier sesión anterior de este navegador y se crea una nueva.
-    sesiones.destruir(req.idSesion);
-    const id = sesiones.crear(usuario.email);
+    await sesiones.destruir(req.idSesion);
+    const id = await sesiones.crear(usuario.email);
     res.setHeader("Set-Cookie", cookieDeSesion(id, { segura: req.secure, duracionMs: sesiones.duracionMs }));
     res.json(usuario);
   }));
@@ -80,7 +82,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
     } catch (err) {
       // La sesión existía pero el usuario ya no (fue eliminado): se limpia.
       if (err && err.codigo === "NO_AUTENTICADO") {
-        sesiones.destruir(req.idSesion);
+        await sesiones.destruir(req.idSesion);
         res.setHeader("Set-Cookie", cookieBorrada({ segura: req.secure }));
       }
       throw err;
@@ -88,11 +90,11 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   }));
 
   // Cerrar sesión: se invalida en el servidor y se borra la cookie.
-  app.delete("/api/sesion", exigirSesion, (req, res) => {
-    sesiones.destruir(req.idSesion);
+  app.delete("/api/sesion", exigirSesion, asincrono(async (req, res) => {
+    await sesiones.destruir(req.idSesion);
     res.setHeader("Set-Cookie", cookieBorrada({ segura: req.secure }));
     res.status(204).end();
-  });
+  }));
 
   app.get("/api/usuarios", exigirSesion, asincrono(async (req, res) => {
     res.json(await sistema.obtenerUsuarios(req.emailSesion));
@@ -106,7 +108,7 @@ function crearApp(sistema, { sesiones = new Sesiones() } = {}) {
   app.delete("/api/usuarios/:email", exigirSesion, asincrono(async (req, res) => {
     await sistema.eliminarUsuario(req.emailSesion, req.params.email);
     // Un usuario eliminado no puede seguir usando sus sesiones.
-    sesiones.destruirDeUsuario(req.params.email.trim().toLowerCase());
+    await sesiones.destruirDeUsuario(req.params.email.trim().toLowerCase());
     if (req.emailSesion === req.params.email.trim().toLowerCase()) {
       res.setHeader("Set-Cookie", cookieBorrada({ segura: req.secure }));
     }
