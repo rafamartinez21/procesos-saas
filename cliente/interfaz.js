@@ -76,7 +76,7 @@ function pantallaAcceso() {
           mostrarMensaje(
             usuario.estado === "activo"
               ? "Cuenta creada. Ya puedes iniciar sesión."
-              : "Cuenta creada. Está pendiente de confirmar: no podrás iniciar sesión hasta entonces.",
+              : "Cuenta creada, pero pendiente de confirmar. Abre el enlace de confirmación (en esta versión aparece en los registros del servidor) y después podrás iniciar sesión.",
             "ok"
           );
         } catch (err) {
@@ -222,6 +222,15 @@ async function panelAdministrador(admin) {
 
 // Al cargar la página (y tras cada cambio de sesión) se pregunta al servidor si hay
 // sesión: así, recargar no obliga a volver a iniciar sesión.
+// Si se llega desde el enlace de confirmación, el servidor redirige a /?confirmada=ok|error.
+function mensajeDeConfirmacion() {
+  const resultado = new URLSearchParams(window.location.search).get("confirmada");
+  if (!resultado) return;
+  if (resultado === "ok") mostrarMensaje("Cuenta confirmada. Ya puedes iniciar sesión.", "ok");
+  else mostrarMensaje("El enlace de confirmación no es válido, ha caducado o ya se usó.", "error");
+  window.history.replaceState({}, "", window.location.pathname);
+}
+
 async function arrancar(limpiarMensaje = true) {
   if (limpiarMensaje) mostrarMensaje("");
   try {
@@ -234,4 +243,5 @@ async function arrancar(limpiarMensaje = true) {
   }
 }
 
-arrancar();
+mensajeDeConfirmacion();
+arrancar(false);

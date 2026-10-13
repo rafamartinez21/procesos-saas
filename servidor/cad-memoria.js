@@ -9,6 +9,7 @@
 //   listarUsuarios()                    -> [usuario]
 //   actualizarUsuario(email, cambios)   -> usuario | undefined
 //   eliminarUsuario(email)              -> true si existía, false si no
+//   buscarUsuarioPorToken(hash)         -> usuario | undefined (por tokenConfirmacion)
 // Todos son async para que cambiar a una base de datos no obligue a tocar la lógica.
 
 function CadMemoria() {
@@ -43,6 +44,13 @@ function CadMemoria() {
 
   this.eliminarUsuario = async function (email) {
     return this.usuarios.delete(email);
+  };
+
+  this.buscarUsuarioPorToken = async function (hash) {
+    for (const u of this.usuarios.values()) {
+      if (u.tokenConfirmacion && u.tokenConfirmacion === hash) return { ...u };
+    }
+    return undefined;
   };
 }
 

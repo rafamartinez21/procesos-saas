@@ -18,10 +18,13 @@ const ESTADO_HTTP = {
   NO_AUTORIZADO: 403,
   CUENTA_PENDIENTE: 403,
   NO_ENCONTRADO: 404,
+  TOKEN_INVALIDO: 400,
   EMAIL_EN_USO: 409,
 };
 
-function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro() } = {}) {
+// urlPublica: URL base del sitio para construir el enlace de confirmación. Si no se da, se
+// deduce de la petición (suficiente en local; en producción conviene fijarla).
+function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro(), urlPublica } = {}) {
   const app = express();
 
   // Cloud Run está detrás de un proxy que termina el HTTPS. Con esto, req.secure es
@@ -77,9 +80,26 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
 
   // Registro de usuario
   app.post("/api/usuarios", asincrono(async (req, res) => {
-    const usuario = await sistema.registrarUsuario(req.body);
+    const urlBase = urlPublica || `${req.protocol}://${req.get("host")}`;
+    const usuario = await sistema.registrarUsuario(req.body, { urlBase });
     registro.info("usuario registrado", { email: usuario.email, estado: usuario.estado });
     res.status(201).json(usuario);
+  }));
+
+  // Confirmar cuenta: es el enlace que recibe el usuario, se abre desde el navegador (GET).
+  // Siempre redirige a la aplicación con el resultado, para que la interfaz lo muestre.
+  app.get("/api/confirmar", asincrono(async (req, res) => {
+    try {
+      const usuario = await sistema.confirmarConToken(req.query.token);
+      registro.info("cuenta confirmada", { email: usuario.email });
+      res.redirect(302, "/?confirmada=ok");
+    } catch (err) {
+      if (err && err.name === "ErrorNegocio") {
+        registro.aviso("confirmacion rechazada", { codigo: err.codigo });
+        return res.redirect(302, "/?confirmada=error");
+      }
+      throw err;
+    }
   }));
 
   // Iniciar sesión

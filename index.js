@@ -32,8 +32,13 @@ async function main() {
     sesiones = new Sesiones();
     registro.aviso("DATABASE_URL no definida: los datos se guardan en memoria y se pierden al reiniciar");
   }
-  // AUTO_CONFIRMAR=true: PROVISIONAL hasta el hito 4 (confirmación por correo).
-  const sistema = new Sistema(cad, { autoConfirmar: process.env.AUTO_CONFIRMAR === "true" });
+  // Confirmación de cuenta: el servidor no envía correo; escribe el enlace en el log y quien
+  // administra lo abre en el navegador. Para usar correo basta cambiar esta función.
+  const enviarConfirmacion = async (email, token, contexto = {}) => {
+    const base = process.env.URL_PUBLICA || contexto.urlBase || `http://localhost:${PORT}`;
+    registro.info("enlace de confirmacion", { email, enlace: `${base}/api/confirmar?token=${token}` });
+  };
+  const sistema = new Sistema(cad, { enviarConfirmacion });
 
   // Primer administrador, a partir de variables de entorno (nunca en el código).
   // Si ya existe en la base de datos, no se toca.
@@ -47,7 +52,7 @@ async function main() {
     registro.aviso("ADMIN_EMAIL y ADMIN_PASSWORD no definidas: no hay administrador");
   }
 
-  const app = crearApp(sistema, { sesiones, registro });
+  const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA });
   app.listen(PORT, () => {
     registro.info("servidor arrancado", { puerto: Number(PORT) });
   });

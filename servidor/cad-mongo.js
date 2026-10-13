@@ -7,6 +7,7 @@
 //   listarUsuarios()                    -> [usuario]
 //   actualizarUsuario(email, cambios)   -> usuario | undefined
 //   eliminarUsuario(email)              -> true si existía, false si no
+//   buscarUsuarioPorToken(hash)         -> usuario | undefined (por tokenConfirmacion)
 //
 // Además tiene conectar() y cerrar(), que solo usa quien ensambla las capas (index.js).
 // La cadena de conexión llega por parámetro: este archivo no lee variables de entorno
@@ -75,6 +76,12 @@ function CadMongo(url, { nombreBD = "sistema" } = {}) {
   this.eliminarUsuario = async function (email) {
     const r = await this.usuarios.deleteOne({ email });
     return r.deletedCount === 1;
+  };
+
+  this.buscarUsuarioPorToken = async function (hash) {
+    if (!hash) return undefined;
+    const u = await this.usuarios.findOne({ tokenConfirmacion: hash }, SIN_ID);
+    return u || undefined;
   };
 }
 

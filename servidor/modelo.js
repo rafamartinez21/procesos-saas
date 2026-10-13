@@ -5,11 +5,19 @@
 // Así, en el hito 3 se sustituye el CAD en memoria por uno de base de datos
 // sin tocar este archivo.
 
+const crypto = require("node:crypto");
 const { hashContrasena, verificarContrasena } = require("./contrasenas.js");
 
 const ROL_USUARIO = "usuario";
 const ROL_ADMIN = "admin";
 const LONGITUD_MINIMA_CONTRASENA = 8;
+const DURACION_TOKEN_POR_DEFECTO_MS = 24 * 60 * 60 * 1000; // 24 horas
+
+// El token de confirmación solo viaja en el enlace; en la base de datos se guarda su hash,
+// igual que las contraseñas: quien lea la base no puede confirmar cuentas ajenas.
+function hashToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
 
 // Errores de negocio: llevan un "codigo" estable que la capa API traduce a HTTP.
 class ErrorNegocio extends Error {
@@ -36,12 +44,19 @@ function vistaUsuario(u) {
   };
 }
 
-// opciones.autoConfirmar: SOLO PROVISIONAL (hitos 2 y 3). Mientras no exista la
-// confirmación por correo (hito 4), permite que los usuarios nuevos queden confirmados
-// al registrarse para poder probar el inicio de sesión. Se elimina en el hito 4.
+// Opciones:
+//  - enviarConfirmacion(email, token, contexto): cómo se hace llegar al usuario el token de
+//    confirmación. La lógica no sabe si es un correo o una línea en el log: lo decide quien
+//    ensambla las capas (index.js). Si no se da, no se envía nada.
+//  - autoConfirmar: deja las cuentas nuevas ya confirmadas (útil en pruebas). En producción
+//    no se usa: la cuenta queda pendiente hasta abrir el enlace de confirmación.
+//  - ahora / duracionTokenMs: para poder probar la caducidad del enlace.
 function Sistema(cad, opciones = {}) {
   this.cad = cad;
   this.autoConfirmar = Boolean(opciones.autoConfirmar);
+  this.enviarConfirmacion = opciones.enviarConfirmacion || (async () => {});
+  this.ahora = opciones.ahora || (() => Date.now());
+  this.duracionTokenMs = opciones.duracionTokenMs || DURACION_TOKEN_POR_DEFECTO_MS;
   this._hashFalso = null;
 
   // Resuelve quién hace la petición a partir de su email.
@@ -57,7 +72,8 @@ function Sistema(cad, opciones = {}) {
   };
 
   // Alta de usuario local. Queda pendiente hasta confirmar la cuenta.
-  this.registrarUsuario = async function ({ email, nombre, password } = {}) {
+  // "contexto" (opcional) se pasa tal cual a enviarConfirmacion, p. ej. la URL base del sitio.
+  this.registrarUsuario = async function ({ email, nombre, password } = {}, contexto = {}) {
     const emailNorm = normalizarEmail(email);
     if (!EMAIL_REGEX.test(emailNorm)) {
       throw new ErrorNegocio("EMAIL_INVALIDO", "El email no tiene un formato válido");
@@ -78,6 +94,12 @@ function Sistema(cad, opciones = {}) {
       confirmada: this.autoConfirmar,
       hash: await hashContrasena(password),
     };
+    let token;
+    if (!nuevo.confirmada) {
+      token = crypto.randomBytes(32).toString("hex");
+      nuevo.tokenConfirmacion = hashToken(token);
+      nuevo.tokenCaduca = this.ahora() + this.duracionTokenMs;
+    }
     // Entre la comprobación de arriba y esta inserción pueden entrar otras peticiones
     // (el hash tarda). Por eso el CAD también protege contra duplicados y aquí se traduce.
     try {
@@ -88,7 +110,19 @@ function Sistema(cad, opciones = {}) {
       }
       throw err;
     }
+    if (token) await this.enviarConfirmacion(nuevo.email, token, contexto);
     return vistaUsuario(nuevo);
+  };
+
+  // Confirma la cuenta a partir del token del enlace. El token es de un solo uso: al
+  // confirmar se borra, y un enlace caducado o inventado se rechaza igual que uno ya usado.
+  this.confirmarConToken = async function (token) {
+    const usuario = typeof token === "string" && token ? await this.cad.buscarUsuarioPorToken(hashToken(token)) : undefined;
+    if (!usuario || !usuario.tokenCaduca || usuario.tokenCaduca <= this.ahora()) {
+      throw new ErrorNegocio("TOKEN_INVALIDO", "El enlace de confirmación no es válido, ha caducado o ya se usó");
+    }
+    await this.cad.actualizarUsuario(usuario.email, { confirmada: true, tokenConfirmacion: null, tokenCaduca: null });
+    return vistaUsuario({ ...usuario, confirmada: true });
   };
 
   // Primer administrador: lo crea el arranque del servidor a partir de variables de
