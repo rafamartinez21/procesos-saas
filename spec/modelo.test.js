@@ -4,7 +4,7 @@
 
 const { test, beforeEach } = require("node:test");
 const assert = require("node:assert/strict");
-const { Sistema } = require("../servidor/modelo.js");
+const { Sistema, validarEmail } = require("../servidor/modelo.js");
 const { CadMemoria } = require("../servidor/cad-memoria.js");
 
 const CLAVE = "claveSegura1";
@@ -202,4 +202,45 @@ test("[error] un usuario eliminado ya no puede actuar (su sesión dejaría de se
   await sistema.eliminarUsuario("pepe@test.es", "pepe@test.es");
   await esperarError(sistema.perfil("pepe@test.es"), "NO_AUTENTICADO");
   await esperarError(sistema.eliminarUsuario("pepe@test.es", "pepe@test.es"), "NO_AUTENTICADO");
+});
+
+// ---------- Normalización y validación de email (variante2) ----------
+
+test("variante2: normaliza quitando espacios de los extremos y pasando a minúsculas", () => {
+  assert.equal(validarEmail(" Ana@X.com "), "ana@x.com");
+  assert.equal(validarEmail("  NOMBRE.Apellido@Sub.Dominio.ES  "), "nombre.apellido@sub.dominio.es");
+});
+
+test("variante2: acepta emails con formato válido", () => {
+  assert.equal(validarEmail("a@b.c"), "a@b.c");
+  assert.equal(validarEmail("pepe+test@correo.uclm.es"), "pepe+test@correo.uclm.es");
+});
+
+test("variante2: rechaza un email sin @, con varias @ o sin nada antes de la @", () => {
+  for (const email of ["anax.com", "ana@@x.com", "ana@b@x.com", "@x.com"]) {
+    assert.throws(() => validarEmail(email), { codigo: "EMAIL_INVALIDO" }, email);
+  }
+});
+
+test("variante2: rechaza espacios interiores", () => {
+  assert.throws(() => validarEmail("ana perez@x.com"), { codigo: "EMAIL_INVALIDO" });
+  assert.throws(() => validarEmail("ana@x .com"), { codigo: "EMAIL_INVALIDO" });
+});
+
+test("variante2: rechaza dominios sin punto o que empiezan o terminan por punto", () => {
+  for (const email of ["ana@xcom", "ana@.x.com", "ana@x.com.", "ana@", "ana@."]) {
+    assert.throws(() => validarEmail(email), { codigo: "EMAIL_INVALIDO" }, email);
+  }
+});
+
+test("variante2: rechaza valores ausentes o que no son texto", () => {
+  for (const email of [undefined, null, 123, {}, ["a@b.c"], "", "   "]) {
+    assert.throws(() => validarEmail(email), { codigo: "EMAIL_INVALIDO" }, String(email));
+  }
+});
+
+test("variante2: el registro usa la misma regla (guarda el email normalizado y rechaza el inválido)", async () => {
+  const u = await sistema.registrarUsuario({ email: " Ana@X.com ", password: CLAVE });
+  assert.equal(u.email, "ana@x.com");
+  await esperarError(sistema.registrarUsuario({ email: "ana@x.com.", password: CLAVE }), "EMAIL_INVALIDO");
 });
