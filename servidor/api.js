@@ -76,6 +76,19 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
     res.json({ ok: true });
   });
 
+  // Normalización y validación de email. Pública (no requiere sesión).
+  // Solo lee la petición, llama a la lógica y devuelve la respuesta.
+  app.post("/api/prueba/email", (req, res) => {
+    try {
+      res.json({ email: sistema.validarEmail(req.body && req.body.email) });
+    } catch (err) {
+      if (err && err.codigo === "EMAIL_INVALIDO") {
+        return res.status(400).json({ error: "EMAIL_INVALIDO" });
+      }
+      throw err;
+    }
+  });
+
   // ---------- Públicas ----------
 
   // Registro de usuario

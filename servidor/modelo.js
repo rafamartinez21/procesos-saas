@@ -28,10 +28,37 @@ class ErrorNegocio extends Error {
   }
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizarEmail(email) {
   return typeof email === "string" ? email.trim().toLowerCase() : "";
+}
+
+// Formato válido de un email YA normalizado:
+//  - exactamente una "@", con al menos un carácter antes;
+//  - sin espacios;
+//  - el dominio (tras la "@") contiene al menos un punto y no empieza ni termina por punto.
+function emailValido(normalizado) {
+  const partes = normalizado.split("@");
+  if (partes.length !== 2) return false;
+  const [local, dominio] = partes;
+  return (
+    local.length > 0 &&
+    !/\s/.test(normalizado) &&
+    dominio.includes(".") &&
+    !dominio.startsWith(".") &&
+    !dominio.endsWith(".")
+  );
+}
+
+// Normaliza (quita los espacios del principio y del final y pasa a minúsculas) y valida el
+// formato. Es lógica pura: no accede a la base de datos. Devuelve el email normalizado o
+// lanza ErrorNegocio EMAIL_INVALIDO (también si no es un string).
+function validarEmail(email) {
+  const normalizado = typeof email === "string" ? normalizarEmail(email) : "";
+  if (!emailValido(normalizado)) {
+    throw new ErrorNegocio("EMAIL_INVALIDO", "El email no tiene un formato válido");
+  }
+  return normalizado;
 }
 
 // Lo que se devuelve hacia fuera de cada usuario. NUNCA incluye el hash de la contraseña.
@@ -59,6 +86,9 @@ function Sistema(cad, opciones = {}) {
   this.duracionTokenMs = opciones.duracionTokenMs || DURACION_TOKEN_POR_DEFECTO_MS;
   this._hashFalso = null;
 
+  // Regla de normalización y validación de email (función de lógica, sin base de datos).
+  this.validarEmail = validarEmail;
+
   // Resuelve quién hace la petición a partir de su email.
   // El ROL se lee siempre de los datos guardados, nunca de lo que diga el cliente.
   // Si el usuario fue eliminado, deja de existir aquí y cualquier sesión suya deja de servir.
@@ -74,10 +104,7 @@ function Sistema(cad, opciones = {}) {
   // Alta de usuario local. Queda pendiente hasta confirmar la cuenta.
   // "contexto" (opcional) se pasa tal cual a enviarConfirmacion, p. ej. la URL base del sitio.
   this.registrarUsuario = async function ({ email, nombre, password } = {}, contexto = {}) {
-    const emailNorm = normalizarEmail(email);
-    if (!EMAIL_REGEX.test(emailNorm)) {
-      throw new ErrorNegocio("EMAIL_INVALIDO", "El email no tiene un formato válido");
-    }
+    const emailNorm = validarEmail(email);
     if (typeof password !== "string" || password.length < LONGITUD_MINIMA_CONTRASENA) {
       throw new ErrorNegocio(
         "CONTRASENA_DEBIL",
@@ -130,7 +157,7 @@ function Sistema(cad, opciones = {}) {
   // puede autopromocionarse desde fuera). Es idempotente: si ya existe, no hace nada.
   this.crearAdministradorInicial = async function ({ email, password } = {}) {
     const emailNorm = normalizarEmail(email);
-    if (!EMAIL_REGEX.test(emailNorm) || typeof password !== "string" || password.length < LONGITUD_MINIMA_CONTRASENA) {
+    if (!emailValido(emailNorm) || typeof password !== "string" || password.length < LONGITUD_MINIMA_CONTRASENA) {
       throw new ErrorNegocio("ADMIN_INVALIDO", "Email o contraseña del administrador inicial no válidos");
     }
     if (await this.cad.buscarUsuario(emailNorm)) {
@@ -222,4 +249,4 @@ function Sistema(cad, opciones = {}) {
   };
 }
 
-module.exports = { Sistema, ErrorNegocio, ROL_USUARIO, ROL_ADMIN };
+module.exports = { Sistema, ErrorNegocio, validarEmail, ROL_USUARIO, ROL_ADMIN };

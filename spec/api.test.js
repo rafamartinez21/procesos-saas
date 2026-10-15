@@ -161,3 +161,21 @@ test("[error] una ruta de API desconocida devuelve 404 y un JSON mal formado 400
   });
   assert.equal(res.status, 400);
 });
+
+test("variante2: POST /api/prueba/email es pública y cumple el contrato", async () => {
+  const ok = await llamar("POST", "/api/prueba/email", { cuerpo: { email: " Ana@X.com " } });
+  assert.equal(ok.estado, 200);
+  assert.deepEqual(ok.cuerpo, { email: "ana@x.com" });
+
+  const malo = await llamar("POST", "/api/prueba/email", { cuerpo: { email: "ana@x" } });
+  assert.equal(malo.estado, 400);
+  assert.deepEqual(malo.cuerpo, { error: "EMAIL_INVALIDO" });
+
+  const sinEmail = await llamar("POST", "/api/prueba/email", { cuerpo: {} });
+  assert.equal(sinEmail.estado, 400);
+  assert.ok(sinEmail.cuerpo.error);
+
+  const tipoIncorrecto = await llamar("POST", "/api/prueba/email", { cuerpo: { email: 42 } });
+  assert.equal(tipoIncorrecto.estado, 400);
+  assert.ok(tipoIncorrecto.cuerpo.error);
+});
