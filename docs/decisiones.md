@@ -71,7 +71,7 @@ timestamp: 2026-10-28
 
 - **Qué se decidió:** el registro deja la cuenta pendiente y genera un token de un solo uso (se guarda su hash y caduca a las 24 h). El enlace `/api/confirmar` se escribe en el log en lugar de enviarse por correo. La lógica recibe `enviarConfirmacion` desde `index.js` ([PR #13](https://github.com/rafamartinez21/procesos-saas/pull/13)).
 - **Por qué:** según el commit `142225c`, la lógica no sabe cómo se entrega el enlace. La confirmación por correo corresponde al hito 4, que no entraba en este sprint; escribir el enlace en el log me permitió implementar y probar todo el flujo (cuenta pendiente, token de un solo uso, caducidad y activación) sin depender todavía de un servicio externo. Pasar a correo real solo exige cambiar `enviarConfirmacion`.
-- **Estado:** vigente, como solución provisional (RF-02 sigue pendiente).
+- **Estado:** sustituida por D-16 en producción (el enlace en el log se mantiene solo cuando no hay proveedor de correo configurado, en desarrollo).
 
 ## D-12 Pruebas con `node:test` y `mongodb-memory-server`
 
@@ -95,4 +95,10 @@ timestamp: 2026-10-28
 
 - **Qué se decidió:** el inicio de sesión devuelve `CREDENCIALES_INVALIDAS` en los dos casos. Si el usuario no existe, verifica contra un hash falso.
 - **Por qué:** según el comentario de `iniciarSesion` en [servidor/modelo.js](../servidor/modelo.js), para no revelar qué emails están registrados.
+- **Estado:** vigente.
+
+## D-16 Brevo para enviar el correo de confirmación
+
+- **Qué se decidió:** el enlace de confirmación se envía por correo con la API transaccional de Brevo. La lógica sigue recibiendo `enviarConfirmacion`; el cliente de Brevo se crea en `index.js` y se inyecta.
+- **Por qué:** tiene capa gratuita (300 correos al día), se usa por API HTTPS (los proveedores cloud suelen bloquear el SMTP directo, apartado 9 de la especificación) y permite enviar a cualquier destinatario verificando solo el remitente, sin dominio propio.
 - **Estado:** vigente.
