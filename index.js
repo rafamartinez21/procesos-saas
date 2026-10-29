@@ -10,6 +10,7 @@ const { crearApp } = require("./servidor/api.js");
 const { Sesiones } = require("./servidor/sesiones.js");
 const { SesionesMongo } = require("./servidor/sesiones-mongo.js");
 const { crearRegistro } = require("./servidor/registro.js");
+const { crearCorreoBrevo, correoDeConfirmacion } = require("./servidor/correo-brevo.js");
 
 const PORT = process.env.PORT || 3000;
 
@@ -32,11 +33,27 @@ async function main() {
     sesiones = new Sesiones();
     registro.aviso("DATABASE_URL no definida: los datos se guardan en memoria y se pierden al reiniciar");
   }
-  // Confirmación de cuenta: el servidor no envía correo; escribe el enlace en el log y quien
-  // administra lo abre en el navegador. Para usar correo basta cambiar esta función.
+  // Confirmación de cuenta: con BREVO_API_KEY y CORREO_REMITENTE el enlace se envía por
+  // correo (D-16). Sin ellas (desarrollo local) se escribe en el log para poder probarlo.
+  // La lógica solo recibe esta función: no sabe qué servicio se usa.
+  const correo = process.env.BREVO_API_KEY && process.env.CORREO_REMITENTE
+    ? crearCorreoBrevo({ apiKey: process.env.BREVO_API_KEY, remitente: process.env.CORREO_REMITENTE })
+    : null;
+  if (!correo) registro.aviso("BREVO_API_KEY o CORREO_REMITENTE no definidas: el enlace de confirmación se escribirá en el log");
   const enviarConfirmacion = async (email, token, contexto = {}) => {
     const base = process.env.URL_PUBLICA || contexto.urlBase || `http://localhost:${PORT}`;
-    registro.info("enlace de confirmacion", { email, enlace: `${base}/api/confirmar?token=${token}` });
+    const enlace = `${base}/api/confirmar?token=${token}`;
+    if (!correo) {
+      registro.info("enlace de confirmacion", { email, enlace });
+      return;
+    }
+    try {
+      await correo.enviar({ para: email, ...correoDeConfirmacion(enlace) });
+      registro.info("correo de confirmacion enviado", { email });
+    } catch (err) {
+      // El registro no falla por esto: el usuario puede pedir que se reenvíe el correo.
+      registro.error("no se pudo enviar el correo de confirmacion", { email, error: err.message, detalle: err.detalle });
+    }
   };
   const sistema = new Sistema(cad, { enviarConfirmacion });
 

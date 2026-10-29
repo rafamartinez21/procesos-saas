@@ -60,7 +60,25 @@ function pantallaAcceso() {
     el("h2", {}, "Iniciar sesión"),
     campo("acceso", "Email", { name: "email", type: "email", required: "", autocomplete: "username" }),
     campo("acceso", "Contraseña", { name: "password", type: "password", required: "", autocomplete: "current-password" }),
-    el("button", { type: "submit" }, "Entrar")
+    el("button", { type: "submit" }, "Entrar"),
+    el(
+      "button",
+      {
+        type: "button",
+        class: "secundario",
+        onclick: async (e) => {
+          const email = e.target.form.elements.email.value;
+          if (!email) return mostrarMensaje("Escribe tu email para reenviarte el correo de confirmación.", "error");
+          try {
+            const r = await ClienteApi.reenviarConfirmacion(email);
+            mostrarMensaje(r.mensaje, "ok");
+          } catch (err) {
+            mostrarError(err);
+          }
+        },
+      },
+      "Reenviar correo de confirmación"
+    )
   );
 
   const formRegistro = el(
@@ -76,7 +94,7 @@ function pantallaAcceso() {
           mostrarMensaje(
             usuario.estado === "activo"
               ? "Cuenta creada. Ya puedes iniciar sesión."
-              : "Cuenta creada, pero pendiente de confirmar. Abre el enlace de confirmación (en esta versión aparece en los registros del servidor) y después podrás iniciar sesión.",
+              : "Cuenta creada. Te hemos enviado un correo con el enlace de confirmación (revisa también la carpeta de spam). Después podrás iniciar sesión.",
             "ok"
           );
         } catch (err) {

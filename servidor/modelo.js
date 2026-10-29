@@ -124,8 +124,7 @@ function Sistema(cad, opciones = {}) {
     let token;
     if (!nuevo.confirmada) {
       token = crypto.randomBytes(32).toString("hex");
-      nuevo.tokenConfirmacion = hashToken(token);
-      nuevo.tokenCaduca = this.ahora() + this.duracionTokenMs;
+      Object.assign(nuevo, this._datosToken(token));
     }
     // Entre la comprobación de arriba y esta inserción pueden entrar otras peticiones
     // (el hash tarda). Por eso el CAD también protege contra duplicados y aquí se traduce.
@@ -139,6 +138,21 @@ function Sistema(cad, opciones = {}) {
     }
     if (token) await this.enviarConfirmacion(nuevo.email, token, contexto);
     return vistaUsuario(nuevo);
+  };
+
+  this._datosToken = function (token) {
+    return { tokenConfirmacion: hashToken(token), tokenCaduca: this.ahora() + this.duracionTokenMs };
+  };
+
+  // Reenvía el enlace de confirmación con un token nuevo (el anterior deja de valer).
+  // No revela si el email existe: si no hay una cuenta local pendiente, no hace nada.
+  this.reenviarConfirmacion = async function (email, contexto = {}) {
+    const emailNorm = normalizarEmail(email);
+    const usuario = emailNorm ? await this.cad.buscarUsuario(emailNorm) : undefined;
+    if (!usuario || usuario.confirmada || !usuario.hash) return;
+    const token = crypto.randomBytes(32).toString("hex");
+    await this.cad.actualizarUsuario(emailNorm, this._datosToken(token));
+    await this.enviarConfirmacion(emailNorm, token, contexto);
   };
 
   // Confirma la cuenta a partir del token del enlace. El token es de un solo uso: al

@@ -115,6 +115,14 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
     }
   }));
 
+  // Reenviar el correo de confirmación. Responde igual exista o no la cuenta, para no
+  // revelar qué emails están registrados.
+  app.post("/api/confirmacion", asincrono(async (req, res) => {
+    const urlBase = urlPublica || `${req.protocol}://${req.get("host")}`;
+    await sistema.reenviarConfirmacion(req.body && req.body.email, { urlBase });
+    res.status(202).json({ mensaje: "Si la cuenta existe y está pendiente, te hemos enviado un nuevo enlace de confirmación." });
+  }));
+
   // Iniciar sesión
   app.post("/api/sesion", asincrono(async (req, res) => {
     const usuario = await sistema.iniciarSesion(req.body);

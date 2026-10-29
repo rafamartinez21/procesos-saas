@@ -39,12 +39,13 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
 | Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
+| Servicio externo | [servidor/correo-brevo.js](../servidor/correo-brevo.js) | Envío de correo con la API de Brevo. Se crea en `index.js` y la lógica solo recibe `enviarConfirmacion`. |
 
 **Fronteras exactas:**
 
 - **API → lógica:** `crearApp(sistema, …)` recibe el objeto `Sistema` y solo llama a sus métodos. La API no decide permisos: la lógica lanza `NO_AUTORIZADO` y la API lo traduce a 403 con la tabla `ESTADO_HTTP`.
 - **Lógica → datos:** `new Sistema(cad, opciones)` recibe el CAD por parámetro. La lógica solo usa los métodos de la interfaz del CAD y no conoce MongoDB ni HTTP. Las pruebas de contrato ([spec/cad.test.js](../spec/cad.test.js)) ejecutan las mismas pruebas contra los dos CAD.
-- **Servicios externos:** la lógica recibe `enviarConfirmacion` como opción desde `index.js`. Ahora escribe el enlace de confirmación en el log, y para usar correo solo habría que cambiar esa función.
+- **Servicios externos:** la lógica recibe `enviarConfirmacion` como opción desde `index.js`, que envía el enlace por correo con Brevo (o lo escribe en el log si no hay clave configurada). La lógica no conoce Brevo ni HTTP.
 
 ## Endpoints
 
@@ -56,6 +57,7 @@ Definidos en [servidor/api.js](../servidor/api.js). "Sesión" significa que sin 
 | POST | `/api/prueba/email` | Cualquiera |
 | POST | `/api/usuarios` | Cualquiera (registro) |
 | GET | `/api/confirmar` | Cualquiera con el enlace de confirmación |
+| POST | `/api/confirmacion` | Cualquiera (reenvía el enlace; responde igual exista o no la cuenta) |
 | POST | `/api/sesion` | Cualquiera (inicio de sesión) |
 | GET | `/api/sesion` | Sesión |
 | DELETE | `/api/sesion` | Sesión |
