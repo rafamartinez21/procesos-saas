@@ -4,6 +4,7 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-10-29 | RF-04: inicio de sesión con Google (OAuth); un email con cuenta local se rechaza | [PR #18](https://github.com/rafamartinez21/procesos-saas/pull/18) |
 | 2026-10-29 | RF-02: confirmación de cuenta por correo con Brevo y reenvío del enlace | [PR #17](https://github.com/rafamartinez21/procesos-saas/pull/17) |
 | 2026-10-29 | Bundle OKF del Sprint 1 en `docs/` | [PR #16](https://github.com/rafamartinez21/procesos-saas/pull/16) |
 | 2026-10-15 | Normalización y validación de email en la lógica y endpoint `POST /api/prueba/email` (variante 2 de la prueba individual) | [PR #15](https://github.com/rafamartinez21/procesos-saas/pull/15) |
