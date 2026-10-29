@@ -97,6 +97,24 @@ test("cada usuario tiene su propio token", async () => {
   assert.equal((await cad.buscarUsuario("b@test.es")).confirmada, true);
 });
 
+test("reenviar genera un token nuevo y el anterior deja de valer", async () => {
+  await sistema.registrarUsuario({ email: "pepe@test.es", password: CLAVE });
+  const viejo = enviados[0].token;
+  await sistema.reenviarConfirmacion("PEPE@test.es");
+  assert.equal(enviados.length, 2);
+  assert.notEqual(enviados[1].token, viejo);
+  await esperarError(sistema.confirmarConToken(viejo), "TOKEN_INVALIDO");
+  assert.equal((await sistema.confirmarConToken(enviados[1].token)).estado, "activo");
+});
+
+test("[error] reenviar a un email inexistente o ya confirmado no envía nada", async () => {
+  await sistema.reenviarConfirmacion("nadie@test.es");
+  await sistema.registrarUsuario({ email: "pepe@test.es", password: CLAVE });
+  await sistema.confirmarConToken(enviados[0].token);
+  await sistema.reenviarConfirmacion("pepe@test.es");
+  assert.equal(enviados.length, 1);
+});
+
 // ---------- API: el enlace que se pega en el navegador ----------
 
 let servidor;
@@ -155,4 +173,16 @@ test("[error] un enlace inventado o ya usado redirige con error y no activa nada
   await fetch(`${base}/api/confirmar?token=${tokens[email]}`, { redirect: "manual" });
   const repetido = await fetch(`${base}/api/confirmar?token=${tokens[email]}`, { redirect: "manual" });
   assert.equal(repetido.headers.get("location"), "/?confirmada=error");
+});
+
+test("POST /api/confirmacion responde igual exista o no la cuenta", async () => {
+  const email = "rosa@test.es";
+  await post("/api/usuarios", { email, password: CLAVE });
+  const primero = tokens[email];
+  const existe = await post("/api/confirmacion", { email });
+  const noExiste = await post("/api/confirmacion", { email: "fantasma@test.es" });
+  assert.equal(existe.status, 202);
+  assert.equal(noExiste.status, 202);
+  assert.deepEqual(await existe.json(), await noExiste.json());
+  assert.notEqual(tokens[email], primero);
 });

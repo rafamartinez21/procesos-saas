@@ -80,6 +80,7 @@ button {
   border-radius: 6px;
 }
 button.peligro { color: var(--peligro); background: transparent; border-color: var(--peligro); }
+button.secundario { color: var(--primario); background: transparent; margin-left: 8px; }
 td.acciones button { margin-right: 6px; padding: 4px 10px; }
 td.acciones button:not(.peligro) { color: var(--primario); background: transparent; }
 

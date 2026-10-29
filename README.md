@@ -19,6 +19,7 @@ Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 | GitHub Actions | CI integrada en el repositorio, sin servicios externos. |
 | MongoDB Atlas (driver `mongodb`) | Base de datos real con capa gratuita (M0) en Google Cloud, en la misma región que Cloud Run; el modelo de documentos encaja con un usuario por documento y los índices únicos evitan emails duplicados. |
 | Registro JSON por la salida estándar | Cloud Run lo envía a Cloud Logging, que filtra por nivel (`severity`) sin añadir librerías. |
+| Brevo (API transaccional) | Envía el correo de confirmación con capa gratuita y por HTTPS, porque los proveedores cloud suelen bloquear el SMTP directo; no necesita dominio propio. |
 | `mongodb-memory-server` (solo pruebas) | MongoDB temporal en local: las pruebas del CAD y de las sesiones usan una base de datos de verdad sin tocar Atlas ni necesitar secretos. |
 | Google Cloud Run | Despliegue sencillo desde el repositorio, con capa gratuita y URL pública con HTTPS. |
 
@@ -82,6 +83,7 @@ Solo nombres; los valores van en el entorno o en un `.env` local (no se sube al 
 - `PORT`
 - `DATABASE_URL`: cadena de conexión de MongoDB Atlas. Es un secreto: en Cloud Run va como variable de entorno del servicio, nunca en el repositorio.
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: administrador inicial (se crea al arrancar si no existe).
+- `BREVO_API_KEY`, `CORREO_REMITENTE`: clave de la API de Brevo y remitente verificado para el correo de confirmación. Sin ellas, el enlace se escribe en el log.
 - `URL_PUBLICA`: URL pública de la aplicación, para construir el enlace de confirmación. Opcional: si falta, se deduce de la petición.
 
 ## Acceso como administrador para la revisión
@@ -101,10 +103,10 @@ El primer administrador se crea al arrancar el servidor con `ADMIN_EMAIL` y `ADM
 
 1. Al registrarse, la cuenta queda **pendiente** y no puede iniciar sesión (403 `CUENTA_PENDIENTE`).
 2. El servidor genera un token aleatorio de un solo uso (caduca a las 24 h) y guarda solo su hash.
-3. En lugar de enviar un correo, escribe en el log una línea `enlace de confirmacion` con la URL `.../api/confirmar?token=...`. En Cloud Run se lee en *Registros* del servicio.
+3. Envía un correo con el enlace `.../api/confirmar?token=...` usando Brevo. Si `BREVO_API_KEY` o `CORREO_REMITENTE` no están definidas (desarrollo local), escribe el enlace en el log. Si el correo no llega, el botón «Reenviar correo de confirmación» genera un enlace nuevo (`POST /api/confirmacion`).
 4. Al abrir ese enlace en el navegador la cuenta pasa a activa y se redirige a la aplicación con el resultado.
 
-La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función `enviarConfirmacion` desde `index.js`, así que pasar a correo real solo cambia esa función.
+La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función `enviarConfirmacion` desde `index.js`, que es donde se crea el cliente de Brevo.
 
 ## Roles y registro de actividad
 
@@ -114,7 +116,7 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 ## Limitaciones conocidas (hito 3)
 
 - Cada petición a la API busca la sesión en la base de datos; es suficiente para este proyecto.
-- La confirmación de cuenta no envía correo: el enlace se escribe en el log del servidor y se abre a mano. OAuth no está implementado.
+- OAuth no está implementado.
 
 ## Flujo de trabajo
 
