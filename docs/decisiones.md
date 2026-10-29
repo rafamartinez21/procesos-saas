@@ -102,3 +102,16 @@ timestamp: 2026-10-28
 - **Qué se decidió:** el enlace de confirmación se envía por correo con la API transaccional de Brevo. La lógica sigue recibiendo `enviarConfirmacion`; el cliente de Brevo se crea en `index.js` y se inyecta.
 - **Por qué:** tiene capa gratuita (300 correos al día), se usa por API HTTPS (los proveedores cloud suelen bloquear el SMTP directo, apartado 9 de la especificación) y permite enviar a cualquier destinatario verificando solo el remitente, sin dominio propio.
 - **Estado:** vigente.
+
+## D-17 Google como proveedor de OAuth
+
+- **Qué se decidió:** el inicio de sesión externo se hace con Google (OAuth 2.0 / OpenID Connect, flujo de código de autorización). El cliente de Google es un servicio externo que se crea en `index.js` y se inyecta en la API; la lógica solo recibe el perfil (email, nombre y si el email está verificado).
+- **Por qué:** es el proveedor que usa el material del curso y el proyecto ya está en Google Cloud, donde se registra el cliente OAuth con las URL de retorno de localhost y de la URL pública.
+- **Estado:** vigente.
+
+## D-18 Un email con cuenta local no puede entrar con Google
+
+- **Qué se decidió:** si alguien entra con Google y ya existe una cuenta local (con contraseña) con ese email, se rechaza el acceso y se le pide que inicie sesión con su contraseña. Una cuenta creada con Google queda activa directamente, porque Google ya verifica el email.
+- **Por qué:** evita que la cuenta local quede vinculada a un acceso que su dueño no ha autorizado y mantiene un solo método de acceso por cuenta.
+- **Estado:** vigente.
+
