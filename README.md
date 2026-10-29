@@ -2,7 +2,7 @@
 
 Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 
-**Estado:** hito 3 más confirmación de cuenta por enlace (persistencia en MongoDB Atlas para usuarios y sesiones; secretos en variables de entorno; roles usuario/administrador aplicados en el servidor; registro de actividad). Incluye lo de los hitos 1 y 2: frontend separado en interfaz y cliente de comunicación, registro e inicio de sesión locales con contraseña con hash, sesión que se mantiene al recargar y rutas protegidas.
+**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Documentación del proyecto en [docs/](docs/index.md).
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
@@ -19,11 +19,10 @@ Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 | GitHub Actions | CI integrada en el repositorio, sin servicios externos. |
 | MongoDB Atlas (driver `mongodb`) | Base de datos real con capa gratuita (M0) en Google Cloud, en la misma región que Cloud Run; el modelo de documentos encaja con un usuario por documento y los índices únicos evitan emails duplicados. |
 | Registro JSON por la salida estándar | Cloud Run lo envía a Cloud Logging, que filtra por nivel (`severity`) sin añadir librerías. |
+| Google OAuth 2.0 (sin librerías) | Inicio de sesión externo con el proveedor del material del curso; el flujo de código de autorización se implementa con `fetch` en un módulo propio, sin añadir dependencias. |
 | Brevo (API transaccional) | Envía el correo de confirmación con capa gratuita y por HTTPS, porque los proveedores cloud suelen bloquear el SMTP directo; no necesita dominio propio. |
 | `mongodb-memory-server` (solo pruebas) | MongoDB temporal en local: las pruebas del CAD y de las sesiones usan una base de datos de verdad sin tocar Atlas ni necesitar secretos. |
 | Google Cloud Run | Despliegue sencillo desde el repositorio, con capa gratuita y URL pública con HTTPS. |
-
-_(Se irán añadiendo OAuth y el correo con su justificación.)_
 
 ## Arquitectura
 
@@ -83,6 +82,7 @@ Solo nombres; los valores van en el entorno o en un `.env` local (no se sube al 
 - `PORT`
 - `DATABASE_URL`: cadena de conexión de MongoDB Atlas. Es un secreto: en Cloud Run va como variable de entorno del servicio, nunca en el repositorio.
 - `ADMIN_EMAIL`, `ADMIN_PASSWORD`: administrador inicial (se crea al arrancar si no existe).
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`: cliente OAuth de Google para «Entrar con Google». La URL de retorno registrada en Google debe ser `<URL_PUBLICA>/api/auth/google/callback`.
 - `BREVO_API_KEY`, `CORREO_REMITENTE`: clave de la API de Brevo y remitente verificado para el correo de confirmación. Sin ellas, el enlace se escribe en el log.
 - `URL_PUBLICA`: URL pública de la aplicación, para construir el enlace de confirmación. Opcional: si falta, se deduce de la petición.
 
@@ -108,15 +108,21 @@ El primer administrador se crea al arrancar el servidor con `ADMIN_EMAIL` y `ADM
 
 La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función `enviarConfirmacion` desde `index.js`, que es donde se crea el cliente de Brevo.
 
+## Inicio de sesión con Google
+
+1. «Entrar con Google» lleva a `GET /api/auth/google`, que guarda un `state` aleatorio en una cookie `HttpOnly` y redirige a Google.
+2. Google vuelve a `GET /api/auth/google/callback` con un código. Si el `state` no coincide con la cookie, se rechaza (protección CSRF).
+3. El servidor cambia el código por el perfil (email verificado y nombre) y la lógica decide: si el email es nuevo, crea la cuenta como usuario y ya activa; si se creó con Google, entra; si es una cuenta local, se rechaza y se pide entrar con contraseña (D-18).
+4. La sesión se crea igual que en el inicio de sesión local (cookie `HttpOnly`).
+
 ## Roles y registro de actividad
 
 - Dos roles: `usuario` y `admin`. Listar usuarios y comprobar si uno está activo es solo del administrador; eliminar: el administrador a cualquiera y un usuario solo a sí mismo. Se comprueba en el servidor (`modelo.js`) y el rol se lee siempre de la base de datos, nunca de lo que envíe el cliente.
 - El log escribe una línea JSON por evento (arranque, peticiones, altas, inicios y cierres de sesión, eliminaciones, rechazos y errores inesperados). Se consulta en Cloud Logging, en los registros del servicio de Cloud Run.
 
-## Limitaciones conocidas (hito 3)
+## Limitaciones conocidas
 
 - Cada petición a la API busca la sesión en la base de datos; es suficiente para este proyecto.
-- OAuth no está implementado.
 
 ## Flujo de trabajo
 

@@ -51,6 +51,8 @@ export const ClienteApi = {
   registrar: (email, password, nombre) => peticion("POST", "/api/usuarios", { email, password, nombre }),
   iniciarSesion: (email, password) => peticion("POST", "/api/sesion", { email, password }),
   reenviarConfirmacion: (email) => peticion("POST", "/api/confirmacion", { email }),
+  // OAuth: es una navegación completa (Google tiene que mostrar su página), no un fetch.
+  iniciarSesionGoogle: () => window.location.assign("/api/auth/google"),
   cerrarSesion: () => peticion("DELETE", "/api/sesion"),
   // Devuelve el usuario con sesión, o null si no hay sesión (no es un error: es el estado normal al entrar).
   sesionActual: async () => {

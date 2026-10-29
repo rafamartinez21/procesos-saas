@@ -192,6 +192,38 @@ function Sistema(cad, opciones = {}) {
     return true;
   };
 
+  // Inicio de sesión con un proveedor externo (OAuth), D-17 y D-18. Recibe el perfil ya
+  // obtenido del proveedor: la lógica no sabe nada de Google ni de HTTP.
+  //  - Si no existe, crea la cuenta como "usuario" y ya confirmada (el proveedor verificó el email).
+  //  - Si existe y se creó con ese proveedor, entra.
+  //  - Si existe como cuenta local (con contraseña), se rechaza (D-18).
+  this.iniciarSesionExterna = async function ({ email, nombre, proveedor, emailVerificado } = {}) {
+    if (!emailVerificado) {
+      throw new ErrorNegocio("EMAIL_NO_VERIFICADO", "El proveedor no ha verificado tu email");
+    }
+    const emailNorm = validarEmail(email);
+    const existente = await this.cad.buscarUsuario(emailNorm);
+    if (existente) {
+      if (existente.proveedor === proveedor) return vistaUsuario(existente);
+      throw new ErrorNegocio("CUENTA_LOCAL_EXISTENTE", "Ya existe una cuenta con ese email. Inicia sesión con tu contraseña.");
+    }
+    const nuevo = {
+      email: emailNorm,
+      nombre: typeof nombre === "string" ? nombre.trim() : "",
+      rol: ROL_USUARIO,
+      confirmada: true,
+      proveedor,
+    };
+    try {
+      await this.cad.insertarUsuario(nuevo);
+    } catch (err) {
+      // Si otra petición la creó a la vez, se vuelve a decidir con la cuenta ya guardada.
+      if (err && err.codigo === "DUPLICADO") return this.iniciarSesionExterna({ email, nombre, proveedor, emailVerificado });
+      throw err;
+    }
+    return vistaUsuario(nuevo);
+  };
+
   // Inicio de sesión local. Devuelve el usuario si las credenciales son correctas.
   // Mensaje deliberadamente igual para "no existe" y "contraseña incorrecta", para no
   // revelar qué emails están registrados. La cuenta pendiente solo se revela cuando la

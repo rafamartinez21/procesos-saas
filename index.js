@@ -11,6 +11,7 @@ const { Sesiones } = require("./servidor/sesiones.js");
 const { SesionesMongo } = require("./servidor/sesiones-mongo.js");
 const { crearRegistro } = require("./servidor/registro.js");
 const { crearCorreoBrevo, correoDeConfirmacion } = require("./servidor/correo-brevo.js");
+const { crearOAuthGoogle } = require("./servidor/oauth-google.js");
 
 const PORT = process.env.PORT || 3000;
 
@@ -69,7 +70,13 @@ async function main() {
     registro.aviso("ADMIN_EMAIL y ADMIN_PASSWORD no definidas: no hay administrador");
   }
 
-  const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA });
+  // Inicio de sesión con Google (D-17): solo si están las credenciales del cliente OAuth.
+  const oauthGoogle = process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? crearOAuthGoogle({ clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET })
+    : null;
+  if (!oauthGoogle) registro.aviso("GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET no definidas: el inicio de sesión con Google no estará disponible");
+
+  const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA, oauthGoogle });
   app.listen(PORT, () => {
     registro.info("servidor arrancado", { puerto: Number(PORT) });
   });
