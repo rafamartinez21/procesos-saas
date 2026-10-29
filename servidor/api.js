@@ -4,6 +4,7 @@
 // Las reglas de quién puede qué (roles) las aplica la lógica; aquí solo se exige que
 // haya una sesión válida antes de llegar a ella.
 
+const crypto = require("node:crypto");
 const express = require("express");
 const path = require("path");
 const { crearRegistro } = require("./registro.js");
@@ -19,12 +20,15 @@ const ESTADO_HTTP = {
   CUENTA_PENDIENTE: 403,
   NO_ENCONTRADO: 404,
   TOKEN_INVALIDO: 400,
+  EMAIL_NO_VERIFICADO: 403,
+  CUENTA_LOCAL_EXISTENTE: 409,
   EMAIL_EN_USO: 409,
 };
 
 // urlPublica: URL base del sitio para construir el enlace de confirmación. Si no se da, se
 // deduce de la petición (suficiente en local; en producción conviene fijarla).
-function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro(), urlPublica } = {}) {
+// oauthGoogle: cliente de Google (servicio externo) o null si no está configurado.
+function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro(), urlPublica, oauthGoogle = null } = {}) {
   const app = express();
 
   // Cloud Run está detrás de un proxy que termina el HTTPS. Con esto, req.secure es
@@ -122,6 +126,47 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
     await sistema.reenviarConfirmacion(req.body && req.body.email, { urlBase });
     res.status(202).json({ mensaje: "Si la cuenta existe y está pendiente, te hemos enviado un nuevo enlace de confirmación." });
   }));
+
+  // ---------- Inicio de sesión con Google (OAuth) ----------
+  const COOKIE_ESTADO = "oauth_estado";
+  const urlRetornoGoogle = (req) => `${urlPublica || `${req.protocol}://${req.get("host")}`}/api/auth/google/callback`;
+  const cookieEstado = (valor, req, maxAge) =>
+    [`${COOKIE_ESTADO}=${valor}`, "HttpOnly", "SameSite=Lax", "Path=/api/auth", `Max-Age=${maxAge}`, ...(req.secure ? ["Secure"] : [])].join("; ");
+
+  // 1) Redirige a Google. Guarda en una cookie un "state" aleatorio para comprobarlo a la vuelta.
+  app.get("/api/auth/google", (req, res) => {
+    if (!oauthGoogle) return res.redirect(302, "/?oauth=no-disponible");
+    const estado = crypto.randomBytes(16).toString("hex");
+    res.append("Set-Cookie", cookieEstado(estado, req, 600));
+    res.redirect(302, oauthGoogle.urlAutorizacion({ state: estado, redirectUri: urlRetornoGoogle(req) }));
+  });
+
+  // 2) Google vuelve aquí con un "code". Se comprueba el state, se obtiene el perfil, la lógica
+  //    decide (crear, entrar o rechazar) y se crea la sesión igual que en el login local.
+  app.get("/api/auth/google/callback", async (req, res) => {
+    const estadoGuardado = leerCookie(req.get("cookie"), COOKIE_ESTADO);
+    res.append("Set-Cookie", cookieEstado("", req, 0));
+    if (!oauthGoogle || !estadoGuardado || estadoGuardado !== req.query.state || typeof req.query.code !== "string") {
+      registro.aviso("oauth rechazado", { motivo: "estado o codigo no validos" });
+      return res.redirect(302, "/?oauth=error");
+    }
+    try {
+      const perfil = await oauthGoogle.obtenerPerfil({ code: req.query.code, redirectUri: urlRetornoGoogle(req) });
+      const usuario = await sistema.iniciarSesionExterna({ ...perfil, proveedor: "google" });
+      await sesiones.destruir(req.idSesion);
+      const id = await sesiones.crear(usuario.email);
+      registro.info("inicio de sesion", { email: usuario.email, rol: usuario.rol, proveedor: "google" });
+      res.append("Set-Cookie", cookieDeSesion(id, { segura: req.secure, duracionMs: sesiones.duracionMs }));
+      res.redirect(302, "/");
+    } catch (err) {
+      if (err && err.name === "ErrorNegocio") {
+        registro.aviso("oauth rechazado", { codigo: err.codigo });
+        return res.redirect(302, err.codigo === "CUENTA_LOCAL_EXISTENTE" ? "/?oauth=cuenta-local" : "/?oauth=error");
+      }
+      registro.error("error en oauth", { error: String(err && err.message) });
+      res.redirect(302, "/?oauth=error");
+    }
+  });
 
   // Iniciar sesión
   app.post("/api/sesion", asincrono(async (req, res) => {

@@ -96,3 +96,5 @@ td.acciones button:not(.peligro) { color: var(--primario); background: transpare
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--borde); white-space: nowrap; }
 th { font-size: 0.85rem; color: var(--suave); font-weight: 600; }
+p.separador { text-align: center; margin: 12px 0 8px; color: var(--suave, #888); }
+button.google { width: 100%; color: var(--texto, inherit); background: transparent; border-color: currentColor; }

@@ -39,6 +39,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
 | Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
+| Servicio externo | [servidor/oauth-google.js](../servidor/oauth-google.js) | Cliente OAuth de Google: URL de autorización y cambio del código por el perfil. Se crea en `index.js` y se inyecta en la API; la lógica solo recibe el perfil. |
 | Servicio externo | [servidor/correo-brevo.js](../servidor/correo-brevo.js) | Envío de correo con la API de Brevo. Se crea en `index.js` y la lógica solo recibe `enviarConfirmacion`. |
 
 **Fronteras exactas:**
@@ -59,6 +60,8 @@ Definidos en [servidor/api.js](../servidor/api.js). "Sesión" significa que sin 
 | GET | `/api/confirmar` | Cualquiera con el enlace de confirmación |
 | POST | `/api/confirmacion` | Cualquiera (reenvía el enlace; responde igual exista o no la cuenta) |
 | POST | `/api/sesion` | Cualquiera (inicio de sesión) |
+| GET | `/api/auth/google` | Cualquiera (redirige a Google) |
+| GET | `/api/auth/google/callback` | Vuelta de Google con un `state` que coincide con la cookie |
 | GET | `/api/sesion` | Sesión |
 | DELETE | `/api/sesion` | Sesión |
 | GET | `/api/usuarios` | Sesión y rol administrador |

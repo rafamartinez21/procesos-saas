@@ -14,4 +14,4 @@ timestamp: 2026-10-28
 | ID | Requisito | Estado | Qué falta |
 |---|---|---|---|
 | RF-02 | Confirmación de cuenta por correo | hecho | Correo con Brevo (D-16) y reenvío del enlace. Ver [requisitos.md](requisitos.md). |
-| RF-04 | Inicio de sesión con OAuth | pendiente | No implementado. Hay que decidir el proveedor y qué hacer si el correo ya tiene una cuenta local, y registrar las URL de retorno de localhost y de la URL pública. |
+| RF-04 | Inicio de sesión con OAuth | hecho | Google (D-17); un email con cuenta local se rechaza (D-18). Ver [requisitos.md](requisitos.md). |

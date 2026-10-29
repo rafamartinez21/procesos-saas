@@ -32,7 +32,7 @@ Por verificar: si la protección de la rama `main` está activada (Settings → 
   2. instala Node 22;
   3. instala las dependencias con `npm ci`, que respeta las versiones exactas de `package-lock.json`;
   4. ejecuta `npm test`.
-- **Pruebas:** `npm test` ejecuta 114. Las de MongoDB usan `mongodb-memory-server`, así que la CI no necesita secretos ni acceso a Atlas.
+- **Pruebas:** `npm test` ejecuta 131. Las de MongoDB usan `mongodb-memory-server`, así que la CI no necesita secretos ni acceso a Atlas.
 - **Resultados:** las 30 ejecuciones registradas están en verde (`gh run list --limit 50`).
 
 ## Despliegue continuo

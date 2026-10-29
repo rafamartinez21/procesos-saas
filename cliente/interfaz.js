@@ -78,7 +78,9 @@ function pantallaAcceso() {
         },
       },
       "Reenviar correo de confirmación"
-    )
+    ),
+    el("p", { class: "separador" }, "o"),
+    el("button", { type: "button", class: "google", onclick: () => ClienteApi.iniciarSesionGoogle() }, "Entrar con Google")
   );
 
   const formRegistro = el(
@@ -240,12 +242,22 @@ async function panelAdministrador(admin) {
 
 // Al cargar la página (y tras cada cambio de sesión) se pregunta al servidor si hay
 // sesión: así, recargar no obliga a volver a iniciar sesión.
-// Si se llega desde el enlace de confirmación, el servidor redirige a /?confirmada=ok|error.
+// Mensajes cuando el servidor redirige a la página con un resultado:
+//  /?confirmada=ok|error (enlace de confirmación) y /?oauth=... (vuelta de Google).
+const MENSAJES_OAUTH = {
+  "cuenta-local": "Ya existe una cuenta con ese email. Inicia sesión con tu contraseña.",
+  "no-disponible": "El inicio de sesión con Google no está disponible en este momento.",
+  error: "No se pudo iniciar sesión con Google. Inténtalo de nuevo.",
+};
+
 function mensajeDeConfirmacion() {
-  const resultado = new URLSearchParams(window.location.search).get("confirmada");
-  if (!resultado) return;
-  if (resultado === "ok") mostrarMensaje("Cuenta confirmada. Ya puedes iniciar sesión.", "ok");
-  else mostrarMensaje("El enlace de confirmación no es válido, ha caducado o ya se usó.", "error");
+  const params = new URLSearchParams(window.location.search);
+  const confirmada = params.get("confirmada");
+  const oauth = params.get("oauth");
+  if (!confirmada && !oauth) return;
+  if (confirmada === "ok") mostrarMensaje("Cuenta confirmada. Ya puedes iniciar sesión.", "ok");
+  else if (confirmada) mostrarMensaje("El enlace de confirmación no es válido, ha caducado o ya se usó.", "error");
+  else mostrarMensaje(MENSAJES_OAUTH[oauth] || MENSAJES_OAUTH.error, "error");
   window.history.replaceState({}, "", window.location.pathname);
 }
 
