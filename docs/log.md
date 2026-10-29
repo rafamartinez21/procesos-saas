@@ -4,6 +4,8 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-10-29 | RF-02: confirmación de cuenta por correo con Brevo y reenvío del enlace | [PR #17](https://github.com/rafamartinez21/procesos-saas/pull/17) |
+| 2026-10-29 | Bundle OKF del Sprint 1 en `docs/` | [PR #16](https://github.com/rafamartinez21/procesos-saas/pull/16) |
 | 2026-10-15 | Normalización y validación de email en la lógica y endpoint `POST /api/prueba/email` (variante 2 de la prueba individual) | [PR #15](https://github.com/rafamartinez21/procesos-saas/pull/15) |
 | 2026-10-13 | La CI instala con `npm ci` y el README describe las pruebas de confirmación | [PR #14](https://github.com/rafamartinez21/procesos-saas/pull/14) |
 | 2026-10-13 | Confirmación de cuenta con un enlace de un solo uso escrito en el log; se retira `AUTO_CONFIRMAR` | [PR #13](https://github.com/rafamartinez21/procesos-saas/pull/13) |
