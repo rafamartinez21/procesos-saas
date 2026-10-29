@@ -68,8 +68,12 @@ Objetivos de cada hito según el apartado 10 de la especificación. Las tareas e
 
 ### Qué funcionó
 
-TODO(alumno): ¿qué te funcionó bien en el Sprint 1 (por ejemplo, ramas pequeñas, pruebas antes del PR o el CAD inyectado)?
+- Trabajar con una rama y un pull request por cambio: todo lo que llegó a `main` pasó por la CI, y las 30 ejecuciones están en verde.
+- Inyectar el CAD en la lógica desde el principio: en el hito 3 cambié de memoria a MongoDB sin modificar `modelo.js`.
+- Escribir las mismas pruebas de contrato para los dos CAD y las dos implementaciones de sesiones, con `mongodb-memory-server`, para probar con una base de datos real sin secretos en la CI.
 
 ### Qué cambiaría
 
-TODO(alumno): ¿qué harías distinto en el Sprint 2 (por ejemplo, empezar antes con los servicios externos o repartir más los commits en el tiempo)?
+- Repartir el trabajo en el tiempo: 36 de los 38 commits del Sprint 1 son del mismo día, el 13 de octubre (`git log --date=short`).
+- Llevar el tablero de Donetonic al día desde el principio, en lugar de reconstruirlo al final.
+- Empezar antes con los servicios externos (correo y OAuth), como recomienda la especificación, porque necesitan configurar la URL pública.

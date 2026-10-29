@@ -34,7 +34,7 @@ timestamp: 2026-10-28
 ## D-05 Sesiones en memoria
 
 - **Qué se decidió:** en el hito 2, las sesiones se guardaban en un `Map` en memoria ([PR #6](https://github.com/rafamartinez21/procesos-saas/pull/6)).
-- **Por qué:** TODO(alumno): ¿por qué empezaste con las sesiones en memoria en el hito 2?
+- **Por qué:** el apartado 10 de la especificación pide para el hito 2 que "los datos siguen en memoria" y deja la base de datos para el hito 3. Empecé por lo más simple para tener el inicio de sesión funcionando y probado, y diseñé `Sesiones` con una interfaz que luego pude reimplementar sobre MongoDB sin tocar la API.
 - **Estado:** sustituida por D-06 en producción. La versión en memoria se sigue usando en desarrollo y en las pruebas.
 
 ## D-06 Sesiones en MongoDB
@@ -70,7 +70,7 @@ timestamp: 2026-10-28
 ## D-11 Confirmación de cuenta con un enlace escrito en el log
 
 - **Qué se decidió:** el registro deja la cuenta pendiente y genera un token de un solo uso (se guarda su hash y caduca a las 24 h). El enlace `/api/confirmar` se escribe en el log en lugar de enviarse por correo. La lógica recibe `enviarConfirmacion` desde `index.js` ([PR #13](https://github.com/rafamartinez21/procesos-saas/pull/13)).
-- **Por qué:** según el commit `142225c`, la lógica no sabe cómo se entrega el enlace. TODO(alumno): ¿por qué el enlace en el log y no un proveedor de correo en este sprint?
+- **Por qué:** según el commit `142225c`, la lógica no sabe cómo se entrega el enlace. La confirmación por correo corresponde al hito 4, que no entraba en este sprint; escribir el enlace en el log me permitió implementar y probar todo el flujo (cuenta pendiente, token de un solo uso, caducidad y activación) sin depender todavía de un servicio externo. Pasar a correo real solo exige cambiar `enviarConfirmacion`.
 - **Estado:** vigente, como solución provisional (RF-02 sigue pendiente).
 
 ## D-12 Pruebas con `node:test` y `mongodb-memory-server`
