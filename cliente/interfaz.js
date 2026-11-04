@@ -144,7 +144,7 @@ async function pantallaPrincipal(usuario) {
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
 function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
-  const estado = { lista: [], partida: null, combate: null, conectado: false, catalogo: [], seleccion: [] };
+  const estado = { lista: [], partida: null, combate: null, conectado: false, catalogo: [], seleccion: [], chat: [] };
   const zona = el("section", { class: "vestibulo" });
 
   // El catálogo de criaturas solo hace falta para elegir equipo; se pide una vez.
@@ -181,6 +181,7 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       if (!partida) {
         estado.combate = null;
         estado.seleccion = [];
+        estado.chat = [];
       }
       dibujar();
     } catch (err) {
@@ -230,9 +231,41 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
             )
       ),
       p.jugadores.length < 2 ? el("p", {}, "Comparte el código ", el("strong", { class: "codigo" }, p.id), " con tu rival o espera a que alguien se una.") : null,
-      estado.combate ? dibujarCombate(estado.combate, { catalogo: estado.catalogo, seleccion: estado.seleccion, acciones: accionesCombate }) : null
+      estado.combate ? dibujarCombate(estado.combate, { catalogo: estado.catalogo, seleccion: estado.seleccion, acciones: accionesCombate }) : null,
+      // Contra la máquina no hay nadie con quien hablar.
+      p.jugadores.length === 2 && p.jugadores[1] !== "Autómata de Aetheria" ? panelChat : null
     );
   }
+
+  // RF-22: chat de la partida. Los mensajes se pintan con textContent (función el).
+  const listaChat = el("ol", { class: "chat-mensajes", "aria-live": "polite", "aria-label": "Mensajes del chat" });
+  function dibujarChat() {
+    listaChat.replaceChildren(
+      ...estado.chat.map((m) => el("li", {}, el("strong", {}, `${m.autor}: `), m.texto))
+    );
+    listaChat.scrollTop = listaChat.scrollHeight;
+  }
+  const formChat = el(
+    "form",
+    {
+      class: "en-linea chat-form",
+      onsubmit: async (e) => {
+        e.preventDefault();
+        const campo = e.target.elements.texto;
+        if (!campo.value.trim()) return;
+        try {
+          await ClienteJuego.enviarMensaje(campo.value);
+          campo.value = "";
+        } catch (err) {
+          mostrarError(err);
+        }
+      },
+    },
+    el("label", { for: "chat-texto", class: "solo-lectores" }, "Mensaje"),
+    el("input", { id: "chat-texto", name: "texto", maxlength: "200", autocomplete: "off", placeholder: "Escribe a tu rival…" }),
+    el("button", { type: "submit", class: "secundario" }, "Enviar")
+  );
+  const panelChat = el("div", { class: "chat" }, el("h3", {}, "Chat"), listaChat, formChat);
 
   function formUnirse() {
     return el(
@@ -252,6 +285,13 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
   }
 
   function dibujar() {
+    // Redibujar mueve el campo del chat: si se estaba escribiendo, se le devuelve el foco.
+    const escribiendo = document.activeElement === formChat.elements.texto;
+    pintar();
+    if (escribiendo) formChat.elements.texto.focus();
+  }
+
+  function pintar() {
     const hijos = [el("h2", {}, "Ecos de Aetheria: partidas")];
     if (!estado.conectado) hijos.push(el("p", { class: "suave" }, "Conectando con el servidor de partidas…"));
     if (estado.partida) {
@@ -293,6 +333,14 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       estado.combate = v;
       if (v.fase !== "seleccion") estado.seleccion = [];
       dibujar();
+    },
+    alRecibirMensaje: (m) => {
+      estado.chat = [...estado.chat, m].slice(-50);
+      dibujarChat();
+    },
+    alRecibirHistorialChat: (lista) => {
+      estado.chat = lista;
+      dibujarChat();
     },
     alAbandonarRival: () => mostrarMensaje("Tu rival ha abandonado la partida.", "info"),
     alDesconectar: () => {

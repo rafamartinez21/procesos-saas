@@ -171,3 +171,10 @@ section.progreso { margin-bottom: 16px; }
 .res-derrota { color: var(--error-texto); font-weight: 600; }
 tr.fila-mia td { background: var(--info-fondo); font-weight: 600; }
 .botones-vestibulo { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ---------- chat de la partida (RF-22) ---------- */
+.chat { margin-top: 16px; }
+.chat-mensajes { list-style: none; margin: 0 0 8px; padding: 8px 10px; max-height: 180px; overflow-y: auto; background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; min-height: 48px; }
+.chat-mensajes li { margin: 2px 0; overflow-wrap: anywhere; }
+.chat-form input { flex: 1; width: auto; min-width: 0; text-transform: none; }
+.solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

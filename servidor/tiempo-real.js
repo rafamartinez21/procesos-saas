@@ -14,11 +14,14 @@
 //   combate:equipo { criaturas: [ids] }               -> RF-16
 //   combate:accion { tipo: "atacar", movimiento }     -> RF-17
 //   combate:accion { tipo: "cambiar", indice }        -> RF-17
+//   chat:enviar { texto }                             -> RF-22
 // Eventos que envía el servidor:
 //   partidas (lista)         -> RF-12, a todos cada vez que cambia
 //   partida:estado (partida) -> a los jugadores de una partida cuando cambia
 //   partida:rival-abandona   -> al jugador que se queda solo
 //   combate:estado (vista)   -> a cada jugador, SU vista del combate (RNF-10: nunca la del rival)
+//   chat:mensaje (mensaje)   -> a la sala de la partida, cada mensaje nuevo
+//   chat:historial ([msj])   -> al conectarse a una partida con mensajes
 
 const { Server } = require("socket.io");
 const { leerCookie, NOMBRE_COOKIE } = require("./sesiones.js");
@@ -90,6 +93,8 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       socket.emit("partida:estado", actual);
       const vista = salas.vistaCombate(email);
       if (vista) socket.emit("combate:estado", vista);
+      const chat = salas.chatDe(email);
+      if (chat.length) socket.emit("chat:historial", chat);
     }
 
     // Envuelve cada evento: comprueba la sesión, ejecuta la acción y responde por el ack.
@@ -171,6 +176,12 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     manejar("combate:equipo", async ({ criaturas }) => {
       const id = salas.elegirEquipo(email, criaturas);
       avisarCombate(salas.participantesDe(id));
+      return null;
+    });
+
+    manejar("chat:enviar", async ({ texto }) => {
+      const { id, mensaje } = salas.enviarMensaje(email, texto);
+      io.to(salaDePartida(id)).emit("chat:mensaje", mensaje);
       return null;
     });
 

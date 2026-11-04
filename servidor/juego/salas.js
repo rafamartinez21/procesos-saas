@@ -14,6 +14,17 @@ const PREFIJO_MAQUINA = "maquina:";
 const NOMBRE_MAQUINA = "Autómata de Aetheria";
 const esMaquina = (email) => typeof email === "string" && email.startsWith(PREFIJO_MAQUINA);
 
+// Chat de la partida (RF-22).
+const LONGITUD_MAXIMA_MENSAJE = 200;
+const MENSAJES_GUARDADOS = 50; // los últimos, para quien entra o se reconecta
+const LIMITE_MENSAJES = 5; // como mucho 5 mensajes...
+const VENTANA_LIMITE_MS = 10 * 1000; // ...cada 10 segundos por jugador
+
+// Quita caracteres de control (saltos de línea incluidos) y espacios repetidos.
+function limpiarTexto(texto) {
+  return texto.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 const JUGADORES_POR_PARTIDA = 2;
 const ESTADO_ABIERTA = "abierta"; // esperando rival
 const ESTADO_COMPLETA = "completa"; // ya hay dos jugadores: se está combatiendo
@@ -200,6 +211,35 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   this.vistaCombate = function (email) {
     const partida = buscarDe(email);
     return partida && partida.combate ? partida.combate.vista(email) : null;
+  };
+
+  // RF-22: mensaje en el chat de la partida del jugador. Devuelve { id, mensaje } para que
+  // la capa de tiempo real lo difunda. El texto se limpia y se limita; el cliente lo pinta
+  // siempre como texto, nunca como HTML.
+  this.enviarMensaje = function (email, texto) {
+    const partida = buscarDe(email);
+    if (!partida) throw new ErrorNegocio("NO_EN_PARTIDA", "No estás en ninguna partida");
+    const limpio = typeof texto === "string" ? limpiarTexto(texto) : "";
+    if (!limpio) throw new ErrorNegocio("MENSAJE_INVALIDO", "El mensaje está vacío");
+    if (limpio.length > LONGITUD_MAXIMA_MENSAJE) {
+      throw new ErrorNegocio("MENSAJE_INVALIDO", `El mensaje no puede tener más de ${LONGITUD_MAXIMA_MENSAJE} caracteres`);
+    }
+    const t = ahora();
+    partida.envios = (partida.envios || []).filter((e) => e.email !== email || t - e.t < VENTANA_LIMITE_MS);
+    if (partida.envios.filter((e) => e.email === email).length >= LIMITE_MENSAJES) {
+      throw new ErrorNegocio("DEMASIADOS_MENSAJES", "Estás enviando mensajes muy deprisa; espera unos segundos");
+    }
+    partida.envios.push({ email, t });
+    const autor = partida.jugadores.find((j) => j.email === email).nombre;
+    const mensaje = { autor, texto: limpio, fecha: t };
+    partida.chat = [...(partida.chat || []), mensaje].slice(-MENSAJES_GUARDADOS);
+    return { id: partida.id, mensaje };
+  };
+
+  // Últimos mensajes del chat de la partida del jugador (para quien se reconecta).
+  this.chatDe = function (email) {
+    const partida = buscarDe(email);
+    return partida && partida.chat ? partida.chat.map((m) => ({ ...m })) : [];
   };
 
   // Emails de los dos participantes del combate (incluido quien ya ha salido), para avisarles.

@@ -255,3 +255,58 @@ test("[error] quien ya está en una partida no puede empezar otra contra la máq
   salas.crearPartida(ana);
   esperarError(() => salas.crearPartidaContraMaquina(ana), "YA_EN_PARTIDA");
 });
+
+// ---------- RF-22 chat ----------
+
+test("un mensaje del chat lleva el nombre del autor, nunca su email, y se guarda para quien se reconecta", () => {
+  salas.crearPartida(ana);
+  salas.unirse("P1", luis);
+  const r = salas.enviarMensaje("ana@test.es", "¡Suerte!");
+  assert.equal(r.id, "P1");
+  assert.deepEqual({ autor: r.mensaje.autor, texto: r.mensaje.texto }, { autor: "Ana", texto: "¡Suerte!" });
+  assert.equal(JSON.stringify(r).includes("@"), false);
+  assert.deepEqual(salas.chatDe("luis@test.es").map((m) => m.texto), ["¡Suerte!"]);
+});
+
+test("el texto se limpia: sin saltos de línea, caracteres de control ni espacios de sobra", () => {
+  salas.crearPartida(ana);
+  assert.equal(salas.enviarMensaje("ana@test.es", "  hola\n\n  qué\ttal\u0007 ").mensaje.texto, "hola qué tal");
+});
+
+test("el HTML no se interpreta: se guarda tal cual como texto", () => {
+  salas.crearPartida(ana);
+  assert.equal(salas.enviarMensaje("ana@test.es", "<img src=x onerror=alert(1)>").mensaje.texto, "<img src=x onerror=alert(1)>");
+});
+
+test("[error] mensajes vacíos, no textuales o de más de 200 caracteres se rechazan", () => {
+  salas.crearPartida(ana);
+  esperarError(() => salas.enviarMensaje("ana@test.es", "   \n "), "MENSAJE_INVALIDO");
+  esperarError(() => salas.enviarMensaje("ana@test.es", 42), "MENSAJE_INVALIDO");
+  esperarError(() => salas.enviarMensaje("ana@test.es", "a".repeat(201)), "MENSAJE_INVALIDO");
+  assert.equal(salas.enviarMensaje("ana@test.es", "a".repeat(200)).mensaje.texto.length, 200);
+});
+
+test("[error] quien no está en una partida no puede escribir en ningún chat", () => {
+  esperarError(() => salas.enviarMensaje("ana@test.es", "hola"), "NO_EN_PARTIDA");
+  assert.deepEqual(salas.chatDe("ana@test.es"), []);
+});
+
+test("[error] como mucho 5 mensajes cada 10 segundos por jugador", () => {
+  let t = 0;
+  const s = new Salas({ generarId: () => "P1", ahora: () => t });
+  s.crearPartida(ana);
+  for (let i = 0; i < 5; i++) s.enviarMensaje("ana@test.es", `m${i}`);
+  esperarError(() => s.enviarMensaje("ana@test.es", "uno más"), "DEMASIADOS_MENSAJES");
+  t = 10 * 1000;
+  assert.equal(s.enviarMensaje("ana@test.es", "ya puedo").mensaje.texto, "ya puedo");
+});
+
+test("solo se guardan los últimos 50 mensajes", () => {
+  let t = 0;
+  const s = new Salas({ generarId: () => "P1", ahora: () => (t += 3000) });
+  s.crearPartida(ana);
+  for (let i = 0; i < 60; i++) s.enviarMensaje("ana@test.es", `m${i}`);
+  const chat = s.chatDe("ana@test.es");
+  assert.equal(chat.length, 50);
+  assert.equal(chat[0].texto, "m10");
+});

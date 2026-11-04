@@ -309,3 +309,30 @@ test("partida contra la máquina: se crea, se elige equipo y cada ataque recibe 
   const v = await turno;
   assert.ok(v.eventos.some((e) => e.quien === "rival"), "la máquina también ha actuado");
 });
+
+// ---------- RF-22 ----------
+
+test("chat: el mensaje llega a los dos jugadores con el nombre del autor y se reenvía al reconectarse", async () => {
+  const ana = await clienteDe("ana@test.es");
+  const luis = await clienteDe("luis@test.es");
+  await Promise.all([listo(ana), listo(luis)]);
+  const { partida } = await emitir(ana, "partida:crear");
+  await emitir(luis, "partida:unirse", { id: partida.id });
+  const llegaAna = esperar(ana, "chat:mensaje");
+  const llegaLuis = esperar(luis, "chat:mensaje");
+  assert.equal((await emitir(luis, "chat:enviar", { texto: "¡Buena suerte!" })).ok, true);
+  const [mA, mL] = await Promise.all([llegaAna, llegaLuis]);
+  assert.deepEqual([mA.autor, mA.texto], ["Luis", "¡Buena suerte!"]);
+  assert.equal(mL.texto, "¡Buena suerte!");
+  const otra = await clienteDe("ana@test.es");
+  const historial = await esperar(otra, "chat:historial");
+  assert.deepEqual(historial.map((m) => m.texto), ["¡Buena suerte!"]);
+});
+
+test("[error] chat: sin partida o con un mensaje vacío, se rechaza", async () => {
+  const eva = await clienteDe("eva@test.es");
+  await listo(eva);
+  assert.equal((await emitir(eva, "chat:enviar", { texto: "hola" })).error, "NO_EN_PARTIDA");
+  await emitir(eva, "partida:crear");
+  assert.equal((await emitir(eva, "chat:enviar", { texto: "  " })).error, "MENSAJE_INVALIDO");
+});
