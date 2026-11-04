@@ -8,6 +8,7 @@ const crypto = require("node:crypto");
 const express = require("express");
 const path = require("path");
 const { crearRegistro } = require("./registro.js");
+const { catalogoPublico } = require("./juego/criaturas.js");
 const { Sesiones, leerCookie, cookieDeSesion, cookieBorrada, NOMBRE_COOKIE } = require("./sesiones.js");
 
 // Cada código de error de negocio se traduce a un estado HTTP.
@@ -78,6 +79,11 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
 
   app.get("/api/salud", (req, res) => {
     res.json({ ok: true });
+  });
+
+  // Catálogo de criaturas de Ecos de Aetheria (RF-15). Son datos fijos del juego y públicos.
+  app.get("/api/criaturas", (req, res) => {
+    res.json(catalogoPublico());
   });
 
   // Normalización y validación de email. Pública (no requiere sesión).

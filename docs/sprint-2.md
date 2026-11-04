@@ -29,7 +29,7 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 
 | ID | Requisito | Estado |
 |---|---|---|
-| RF-15 | Catálogo de criaturas con seis elementos y tabla de eficacias | pendiente |
+| RF-15 | Catálogo de criaturas con seis elementos y tabla de eficacias | hecho |
 | RF-16 | Elegir un equipo de tres criaturas antes del combate | pendiente |
 | RF-17 | Turnos: atacar o cambiar de criatura, cálculo de daño y estados alterados | pendiente |
 | RF-18 | Fin de la partida y ganador (o victoria si el rival abandona) | pendiente |
