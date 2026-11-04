@@ -36,6 +36,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | API | [servidor/api.js](../servidor/api.js) | Traduce HTTP a llamadas a la lógica y los `ErrorNegocio` a códigos HTTP. Exige sesión en las rutas protegidas. |
 | API (sesiones) | [servidor/sesiones.js](../servidor/sesiones.js), [servidor/sesiones-mongo.js](../servidor/sesiones-mongo.js) | Sesiones en memoria o en MongoDB, con la misma interfaz, y cookies `HttpOnly`. |
 | Lógica de negocio | [servidor/modelo.js](../servidor/modelo.js) | `Sistema`: reglas de usuarios, roles, registro, inicio de sesión, confirmación y validación de email. Lanza `ErrorNegocio` con un código estable. |
+| Lógica del juego | [servidor/juego/salas.js](../servidor/juego/salas.js) | `Salas`: crear, listar, unirse a y abandonar partidas (hito 5). Sin Socket.IO ni HTTP (D-20); las partidas viven en memoria (D-21). Las vistas públicas no incluyen emails. |
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
 | Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
