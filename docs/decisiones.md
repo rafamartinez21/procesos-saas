@@ -139,3 +139,9 @@ timestamp: 2026-10-28
 - **Qué se decidió:** las criaturas, sus movimientos y la tabla de eficacias están en [servidor/juego/criaturas.js](../servidor/juego/criaturas.js). El cliente las pide con `GET /api/criaturas`.
 - **Por qué:** son reglas del juego, no datos de los usuarios: cambian con una versión del código, se revisan en un pull request y las pruebas comprueban su equilibrio (dos criaturas por elemento, estadísticas que suman 280, cada elemento eficaz contra dos y débil contra dos). En la base de datos no tendrían esas comprobaciones.
 - **Estado:** vigente.
+
+## D-23 Turnos simultáneos y cambios antes que ataques
+
+- **Qué se decidió:** en cada turno los dos jugadores eligen su acción en secreto y el turno se resuelve cuando los dos han elegido. Primero se hacen los cambios de criatura y después los ataques, de la criatura más rápida a la más lenta (empate al azar). Si cae una criatura, su dueño saca otra antes del siguiente turno. Si los dos se quedan sin criaturas a la vez, es empate.
+- **Por qué:** con turnos alternos el segundo jugador vería la acción del primero y tendría ventaja. Elegir a la vez obliga a anticiparse al rival y, como el servidor no revela la acción elegida hasta resolver (RNF-10), nadie puede aprovecharse de ella.
+- **Estado:** vigente.

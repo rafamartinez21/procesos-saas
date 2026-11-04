@@ -40,6 +40,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | Lógica de negocio | [servidor/modelo.js](../servidor/modelo.js) | `Sistema`: reglas de usuarios, roles, registro, inicio de sesión, confirmación y validación de email. Lanza `ErrorNegocio` con un código estable. |
 | Lógica del juego | [servidor/juego/salas.js](../servidor/juego/salas.js) | `Salas`: crear, listar, unirse a y abandonar partidas (hito 5). Sin Socket.IO ni HTTP (D-20); las partidas viven en memoria (D-21). Las vistas públicas no incluyen emails. |
 | Lógica del juego | [servidor/juego/criaturas.js](../servidor/juego/criaturas.js) | Catálogo de criaturas, movimientos, estados y tabla de eficacias (D-22). Datos fijos sin dependencias. |
+| Lógica del juego | [servidor/juego/combate.js](../servidor/juego/combate.js) | `Combate`: elección de equipos, turnos simultáneos (D-23), daño, eficacias, estados alterados y ganador. Valida cada acción y da a cada jugador una vista sin la acción ni el banquillo del rival (RNF-10). El azar se inyecta. |
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
 | Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
