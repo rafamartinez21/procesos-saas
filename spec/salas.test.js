@@ -29,7 +29,7 @@ function esperarError(fn, codigo) {
 
 test("crear una partida la deja abierta con el creador como único jugador", () => {
   const p = salas.crearPartida(ana);
-  assert.deepEqual(p, { id: "P1", estado: "abierta", creador: "Ana", jugadores: ["Ana"], plazas: 1, creada: 1000 });
+  assert.deepEqual(p, { id: "P1", estado: "abierta", creador: "Ana", jugadores: ["Ana"], plazas: 1, creada: 1000, espectadores: 0 });
 });
 
 test("la vista de una partida nunca incluye emails", () => {
@@ -120,7 +120,7 @@ test("[error] quien ya está en otra partida no puede unirse a una nueva", () =>
 
 test("si el único jugador abandona, la partida desaparece", () => {
   salas.crearPartida(ana);
-  assert.deepEqual(salas.abandonar("ana@test.es"), { id: "P1", partida: null, restantes: [] });
+  assert.deepEqual(salas.abandonar("ana@test.es"), { id: "P1", partida: null, restantes: [], espectadores: [] });
   assert.deepEqual(salas.listarAbiertas(), []);
   assert.equal(salas.partidaDe("ana@test.es"), null);
   esperarError(() => salas.obtener("P1"), "PARTIDA_NO_ENCONTRADA");
@@ -309,4 +309,81 @@ test("solo se guardan los últimos 50 mensajes", () => {
   const chat = s.chatDe("ana@test.es");
   assert.equal(chat.length, 50);
   assert.equal(chat[0].texto, "m10");
+});
+
+// ---------- RF-23 espectadores ----------
+
+function conCombate() {
+  const s = new Salas({ generarId: () => "P1", aleatorio: () => 0.5 });
+  s.crearPartida(ana);
+  s.unirse("P1", luis);
+  s.elegirEquipo("ana@test.es", ["pirolince", "brason", "voltarda"]);
+  s.elegirEquipo("luis@test.es", ["marejon", "musgolem", "rocadonte"]);
+  return s;
+}
+
+test("las partidas en curso se listan para mirarlas, con el número de espectadores", () => {
+  const s = conCombate();
+  assert.deepEqual(s.listarEnCurso().map((p) => [p.id, p.espectadores]), [["P1", 0]]);
+  s.observar("P1", eva);
+  assert.equal(s.listarEnCurso()[0].espectadores, 1);
+});
+
+test("el espectador ve a los dos jugadores por igual, sin banquillos, acciones ni emails", () => {
+  const s = conCombate();
+  s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "llamarada" });
+  const { vista } = s.observar("P1", eva);
+  assert.deepEqual(vista.jugadores.map((j) => [j.nombre, j.activa.nombre, j.restantes, j.eleccionHecha]), [
+    ["Ana", "Pirolince", 3, true],
+    ["Luis", "Marejón", 3, false],
+  ]);
+  const texto = JSON.stringify(vista);
+  assert.equal(texto.includes("@"), false);
+  assert.equal(texto.includes("llamarada"), false, "no revela la acción elegida");
+  assert.equal(texto.includes("brason"), false, "no revela el banquillo");
+});
+
+test("los eventos del turno llegan al espectador con el nombre de cada jugador", () => {
+  const s = conCombate();
+  s.observar("P1", eva);
+  s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "embestida" });
+  s.elegirAccion("luis@test.es", { tipo: "atacar", movimiento: "embestida" });
+  const v = s.vistaEspectador("P1");
+  assert.deepEqual(v.eventos.map((e) => e.quien), ["Ana", "Luis"]);
+  assert.equal(v.turno, 2);
+});
+
+test("[error] no se puede mirar una partida propia, una que no ha empezado o una que no existe", () => {
+  const s = conCombate();
+  esperarError(() => s.observar("P1", ana), "YA_EN_PARTIDA");
+  esperarError(() => s.observar("NOEXI", eva), "PARTIDA_NO_ENCONTRADA");
+  salas.crearPartida(ana);
+  esperarError(() => salas.observar("P1", luis), "PARTIDA_SIN_COMBATE");
+});
+
+test("[error] mientras se mira una partida no se puede crear ni unirse a otra", () => {
+  const s = conCombate();
+  s.observar("P1", eva);
+  esperarError(() => s.crearPartida(eva), "YA_EN_PARTIDA");
+  assert.equal(s.dejarDeObservar("eva@test.es"), "P1");
+  assert.equal(s.listarEnCurso()[0].espectadores, 0);
+  esperarError(() => s.dejarDeObservar("eva@test.es"), "NO_OBSERVANDO");
+});
+
+test("el espectador lee el chat de la partida", () => {
+  const s = conCombate();
+  s.enviarMensaje("ana@test.es", "hola");
+  s.observar("P1", eva);
+  assert.deepEqual(s.chatDe("eva@test.es").map((m) => m.texto), ["hola"]);
+  esperarError(() => s.enviarMensaje("eva@test.es", "yo también"), "NO_EN_PARTIDA");
+});
+
+test("cuando la partida desaparece, sus espectadores quedan libres", () => {
+  const s = conCombate();
+  s.observar("P1", eva);
+  s.abandonar("ana@test.es");
+  const r = s.abandonar("luis@test.es");
+  assert.deepEqual(r.espectadores, ["eva@test.es"]);
+  assert.equal(s.observandoDe("eva@test.es"), null);
+  assert.equal(s.crearPartida(eva).id, "P1");
 });

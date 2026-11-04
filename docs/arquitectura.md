@@ -25,7 +25,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 |---|---|---|
 | Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/progreso-vista.js](../cliente/progreso-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego y `progreso-vista.js`, el panel de estadísticas y ranking. |
 | Comunicación | [cliente/cliente-api.js](../cliente/cliente-api.js) | Único archivo que llama a `fetch`. Expone `ClienteApi` y convierte los errores HTTP en `ErrorApi`. |
-| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `crearContraMaquina`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`, `enviarMensaje`) y convierte los rechazos en `ErrorJuego`. |
+| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `crearContraMaquina`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`, `enviarMensaje`, `observar`, `dejarDeObservar`) y convierte los rechazos en `ErrorJuego`. |
 
 **Frontera:** `interfaz.js` importa `ClienteApi` y solo llama a sus funciones (`registrar`, `iniciarSesion`, `cerrarSesion`, `sesionActual`, `listarUsuarios`, `usuarioActivo`, `eliminarUsuario`). No conoce URLs, cabeceras ni cookies. Igual con `ClienteJuego`: la interfaz no conoce los nombres de los eventos.
 
@@ -92,7 +92,10 @@ Definidos en [servidor/tiempo-real.js](../servidor/tiempo-real.js). La conexión
 | Cliente → servidor | `combate:equipo` `{ criaturas }` | Elige su equipo de tres (RF-16) |
 | Cliente → servidor | `combate:accion` `{ tipo, movimiento \| indice }` | Ataca o cambia de criatura (RF-17) |
 | Cliente → servidor | `chat:enviar` `{ texto }` | Escribe en el chat de su partida (RF-22) |
+| Cliente → servidor | `partida:observar` `{ id }` / `partida:dejar-observar` | Empieza o deja de mirar una partida (RF-23) |
 | Servidor → todos | `partidas` | Lista de partidas abiertas, en cada cambio (RF-12) |
+| Servidor → todos | `partidas:en-curso` | Combates que se pueden mirar, con el número de espectadores (RF-23) |
+| Servidor → espectadores | `espectador:estado` / `espectador:fin` | Vista neutral del combate en cada cambio; aviso cuando la partida desaparece (D-26) |
 | Servidor → jugadores | `partida:estado` | Estado de su partida cuando cambia |
 | Servidor → jugador | `partida:rival-abandona` | Su rival ha salido |
 | Servidor → jugadores | `chat:mensaje` | Mensaje nuevo del chat, con el nombre del autor |

@@ -157,3 +157,9 @@ timestamp: 2026-10-28
 - **Qué se decidió:** el rival máquina decide solo a partir de `Combate.vista`, la misma vista que recibe un jugador humano: no conoce la acción elegida ni el banquillo de su rival. Actúa en el servidor en cuanto le toca. Las partidas contra la máquina no se guardan en el historial ni cambian el ELO.
 - **Por qué:** si la máquina viera el estado completo haría trampas, y usar la vista demuestra que la vista basta para jugar. Si contaran para el ranking, se podría subir el ELO jugando contra la máquina en lugar de contra personas.
 - **Estado:** vigente.
+
+## D-26 El espectador ve lo mismo de los dos jugadores y solo lee el chat
+
+- **Qué se decidió:** el espectador ve de cada jugador la criatura en combate, cuántas le quedan y si ya ha elegido su acción, pero nunca el banquillo ni la acción elegida. Puede leer el chat, pero no escribir. Se le avisa desde una sala de Socket.IO distinta de la de los jugadores.
+- **Por qué:** si viera la acción o el banquillo podría chivárselo al rival por otro canal. La sala aparte garantiza que nunca recibe por error la vista privada de un jugador, y una prueba lo comprueba. Que el chat sea de solo lectura evita que el público moleste a los jugadores.
+- **Estado:** vigente.

@@ -9,7 +9,7 @@
 import { ClienteApi } from "./cliente-api.js";
 import { ClienteJuego } from "./cliente-juego.js";
 import { el } from "./dom.js";
-import { dibujarCombate } from "./combate-vista.js";
+import { dibujarCombate, dibujarEspectador } from "./combate-vista.js";
 import { panelProgreso } from "./progreso-vista.js";
 
 const raiz = document.getElementById("app");
@@ -144,7 +144,7 @@ async function pantallaPrincipal(usuario) {
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
 function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
-  const estado = { lista: [], partida: null, combate: null, conectado: false, catalogo: [], seleccion: [], chat: [] };
+  const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, conectado: false, catalogo: [], seleccion: [], chat: [] };
   const zona = el("section", { class: "vestibulo" });
 
   // El catálogo de criaturas solo hace falta para elegir equipo; se pide una vez.
@@ -267,6 +267,42 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
   );
   const panelChat = el("div", { class: "chat" }, el("h3", {}, "Chat"), listaChat, formChat);
 
+  const dejarDeMirar = async () => {
+    try {
+      await ClienteJuego.dejarDeObservar();
+    } catch (err) {
+      mostrarError(err);
+    }
+    estado.mirando = null;
+    estado.chat = [];
+    dibujar();
+  };
+
+  function tarjetaEnCurso(p) {
+    return el(
+      "li",
+      { class: "partida" },
+      el("span", { class: "codigo" }, p.id),
+      el("span", {}, p.jugadores.join(" contra ")),
+      p.espectadores ? el("span", { class: "suave" }, `${p.espectadores} mirando`) : null,
+      el(
+        "button",
+        {
+          type: "button",
+          class: "secundario",
+          onclick: async () => {
+            try {
+              await ClienteJuego.observar(p.id);
+            } catch (err) {
+              mostrarError(err);
+            }
+          },
+        },
+        "Mirar"
+      )
+    );
+  }
+
   function formUnirse() {
     return el(
       "form",
@@ -293,6 +329,14 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
 
   function pintar() {
     const hijos = [el("h2", {}, "Ecos de Aetheria: partidas")];
+    // RF-23: mirando una partida ajena (solo lectura del combate y del chat).
+    if (estado.mirando && !estado.partida) {
+      hijos.push(dibujarEspectador(estado.mirando, { salir: dejarDeMirar }));
+      listaChat.hidden = false;
+      hijos.push(el("div", { class: "chat" }, el("h3", {}, "Chat"), listaChat));
+      zona.replaceChildren(...hijos);
+      return;
+    }
     if (!estado.conectado) hijos.push(el("p", { class: "suave" }, "Conectando con el servidor de partidas…"));
     if (estado.partida) {
       hijos.push(panelPartida(estado.partida));
@@ -314,6 +358,9 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
     hijos.push(el("h3", {}, "Partidas abiertas"));
     const ajenas = estado.lista.filter((p) => !estado.partida || p.id !== estado.partida.id);
     hijos.push(ajenas.length ? el("ul", { class: "lista-partidas" }, ...ajenas.map(tarjetaPartida)) : el("p", { class: "suave" }, "No hay partidas abiertas. ¡Crea una!"));
+    if (!estado.partida && estado.enCurso.length) {
+      hijos.push(el("h3", {}, "Combates en curso"), el("ul", { class: "lista-partidas" }, ...estado.enCurso.map(tarjetaEnCurso)));
+    }
     zona.replaceChildren(...hijos);
   }
 
@@ -332,6 +379,20 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       if (v.fase === "terminada" && (!estado.combate || estado.combate.fase !== "terminada")) setTimeout(alTerminarCombate, 800);
       estado.combate = v;
       if (v.fase !== "seleccion") estado.seleccion = [];
+      dibujar();
+    },
+    alCambiarEnCurso: (lista) => {
+      estado.enCurso = lista;
+      dibujar();
+    },
+    alCambiarEspectador: (v) => {
+      estado.mirando = v;
+      dibujar();
+    },
+    alTerminarEspectador: () => {
+      mostrarMensaje("La partida que mirabas ha terminado y los jugadores se han ido.", "info");
+      estado.mirando = null;
+      estado.chat = [];
       dibujar();
     },
     alRecibirMensaje: (m) => {

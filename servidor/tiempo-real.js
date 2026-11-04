@@ -15,6 +15,7 @@
 //   combate:accion { tipo: "atacar", movimiento }     -> RF-17
 //   combate:accion { tipo: "cambiar", indice }        -> RF-17
 //   chat:enviar { texto }                             -> RF-22
+//   partida:observar { id } / partida:dejar-observar  -> RF-23 (espectador)
 // Eventos que envía el servidor:
 //   partidas (lista)         -> RF-12, a todos cada vez que cambia
 //   partida:estado (partida) -> a los jugadores de una partida cuando cambia
@@ -22,6 +23,9 @@
 //   combate:estado (vista)   -> a cada jugador, SU vista del combate (RNF-10: nunca la del rival)
 //   chat:mensaje (mensaje)   -> a la sala de la partida, cada mensaje nuevo
 //   chat:historial ([msj])   -> al conectarse a una partida con mensajes
+//   partidas:en-curso (lista)-> a todos, partidas con combate que se pueden mirar (RF-23)
+//   espectador:estado (vista)-> a los espectadores de una partida, en cada cambio
+//   espectador:fin           -> a los espectadores cuando la partida desaparece
 
 const { Server } = require("socket.io");
 const { leerCookie, NOMBRE_COOKIE } = require("./sesiones.js");
@@ -29,6 +33,7 @@ const { crearRegistro } = require("./registro.js");
 
 const salaDeUsuario = (email) => `usuario:${email}`;
 const salaDePartida = (id) => `partida:${id}`;
+const salaDeEspectadores = (id) => `espectadores:${id}`;
 
 // Tiempo que se espera tras perder la última conexión de un jugador antes de sacarlo de su
 // partida. Cubre recargar la página y los cortes de red o los que hace Cloud Run al llegar al
@@ -70,7 +75,10 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     }
   });
 
-  const difundirLista = () => io.emit("partidas", salas.listarAbiertas());
+  const difundirLista = () => {
+    io.emit("partidas", salas.listarAbiertas());
+    io.emit("partidas:en-curso", salas.listarEnCurso());
+  };
 
   // Cada jugador recibe su propia vista del combate: la del rival nunca sale del servidor.
   const avisarCombate = (emails) => {
@@ -80,6 +88,13 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     }
   };
 
+  // Jugadores (cada uno su vista) y espectadores (la vista neutral) de una partida.
+  const avisarPartida = (id) => {
+    avisarCombate(salas.participantesDe(id));
+    const vista = salas.vistaEspectador(id);
+    if (vista) io.to(salaDeEspectadores(id)).emit("espectador:estado", vista);
+  };
+
   io.on("connection", (socket) => {
     const { email } = socket.data.jugador;
     socket.join(salaDeUsuario(email));
@@ -87,6 +102,14 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
 
     // Al conectar: la lista de partidas y, si ya estaba en una (otra pestaña), su estado.
     socket.emit("partidas", salas.listarAbiertas());
+    socket.emit("partidas:en-curso", salas.listarEnCurso());
+    const mirando = salas.observandoDe(email);
+    if (mirando) {
+      socket.join(salaDeEspectadores(mirando));
+      socket.emit("espectador:estado", salas.vistaEspectador(mirando));
+      const chat = salas.chatDe(email);
+      if (chat.length) socket.emit("chat:historial", chat);
+    }
     const actual = salas.partidaDe(email);
     if (actual) {
       socket.join(salaDePartida(actual.id));
@@ -136,6 +159,11 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
         io.to(salaDePartida(r.id)).emit("partida:rival-abandona", r.partida);
         io.to(salaDePartida(r.id)).emit("partida:estado", r.partida);
         avisarCombate(r.restantes); // si había combate, el que queda ve que ha ganado
+        const vista = salas.vistaEspectador(r.id);
+        if (vista) io.to(salaDeEspectadores(r.id)).emit("espectador:estado", vista);
+      } else if (r.espectadores && r.espectadores.length) {
+        io.to(salaDeEspectadores(r.id)).emit("espectador:fin");
+        io.in(salaDeEspectadores(r.id)).socketsLeave(salaDeEspectadores(r.id));
       }
       registro.info("partida abandonada", { usuario: email, partida: r.id, eliminada: !r.partida });
       difundirLista();
@@ -165,7 +193,7 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       await entrarEnSala(partida);
       registro.info("jugador unido a partida", { usuario: email, partida: partida.id });
       io.to(salaDePartida(partida.id)).emit("partida:estado", partida);
-      avisarCombate(salas.participantesDe(partida.id));
+      avisarPartida(partida.id);
       difundirLista();
       return partida;
     });
@@ -175,19 +203,42 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     // RF-16 y RF-17: la lógica valida y resuelve; aquí solo se avisa a los dos jugadores.
     manejar("combate:equipo", async ({ criaturas }) => {
       const id = salas.elegirEquipo(email, criaturas);
-      avisarCombate(salas.participantesDe(id));
+      avisarPartida(id);
       return null;
     });
 
     manejar("chat:enviar", async ({ texto }) => {
       const { id, mensaje } = salas.enviarMensaje(email, texto);
-      io.to(salaDePartida(id)).emit("chat:mensaje", mensaje);
+      io.to(salaDePartida(id)).to(salaDeEspectadores(id)).emit("chat:mensaje", mensaje);
+      return null;
+    });
+
+    // RF-23: mirar una partida en curso. El espectador entra en una sala aparte, así no
+    // recibe los avisos de los jugadores (su vista ni sus avisos de partida).
+    manejar("partida:observar", async ({ id }, jugador) => {
+      const anterior = salas.observandoDe(email);
+      const r = salas.observar(id, jugador);
+      if (anterior) io.in(salaDeUsuario(email)).socketsLeave(salaDeEspectadores(anterior));
+      await io.in(salaDeUsuario(email)).socketsJoin(salaDeEspectadores(r.id));
+      registro.info("espectador entra", { usuario: email, partida: r.id });
+      io.to(salaDeUsuario(email)).emit("espectador:estado", r.vista);
+      const chat = salas.chatDe(email);
+      io.to(salaDeUsuario(email)).emit("chat:historial", chat);
+      difundirLista(); // cambia el número de espectadores
+      return null;
+    });
+
+    manejar("partida:dejar-observar", async () => {
+      const id = salas.dejarDeObservar(email);
+      io.in(salaDeUsuario(email)).socketsLeave(salaDeEspectadores(id));
+      difundirLista();
       return null;
     });
 
     manejar("combate:accion", async (accion) => {
       const id = salas.elegirAccion(email, accion);
-      avisarCombate(salas.participantesDe(id));
+      avisarPartida(id);
+      if (salas.obtener(id).estado === "terminada") difundirLista(); // ya no está en curso
       return null;
     });
 
@@ -195,7 +246,12 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     socket.on("disconnect", () => {
       const temporizador = setTimeout(async () => {
         const quedan = await io.in(salaDeUsuario(email)).fetchSockets();
-        if (quedan.length === 0 && salas.partidaDe(email)) abandonar();
+        if (quedan.length > 0) return;
+        if (salas.partidaDe(email)) abandonar();
+        else if (salas.observandoDe(email)) {
+          salas.dejarDeObservar(email);
+          difundirLista();
+        }
       }, esperaReconexionMs);
       temporizador.unref();
     });
