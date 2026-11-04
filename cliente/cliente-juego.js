@@ -31,13 +31,15 @@ function accion(evento, datos) {
 }
 
 export const ClienteJuego = {
-  // avisos: { alCambiarLista(partidas), alCambiarPartida(partida), alAbandonarRival(partida), alDesconectar(motivo) }
+  // avisos: { alCambiarLista(partidas), alCambiarPartida(partida), alAbandonarRival(partida),
+  //           alCambiarCombate(vista), alDesconectar(motivo) }
   conectar(avisos = {}) {
     this.desconectar();
     socket = io({ transports: ["websocket", "polling"] });
     socket.on("partidas", (lista) => avisos.alCambiarLista && avisos.alCambiarLista(lista));
     socket.on("partida:estado", (p) => avisos.alCambiarPartida && avisos.alCambiarPartida(p));
     socket.on("partida:rival-abandona", (p) => avisos.alAbandonarRival && avisos.alAbandonarRival(p));
+    socket.on("combate:estado", (v) => avisos.alCambiarCombate && avisos.alCambiarCombate(v));
     socket.on("connect_error", (err) => avisos.alDesconectar && avisos.alDesconectar(err.message));
     socket.on("disconnect", (motivo) => avisos.alDesconectar && avisos.alDesconectar(motivo));
   },
@@ -51,4 +53,7 @@ export const ClienteJuego = {
   crearPartida: () => accion("partida:crear"),
   unirse: (id) => accion("partida:unirse", { id }),
   abandonar: () => accion("partida:abandonar"),
+  elegirEquipo: (criaturas) => accion("combate:equipo", { criaturas }),
+  atacar: (movimiento) => accion("combate:accion", { tipo: "atacar", movimiento }),
+  cambiar: (indice) => accion("combate:accion", { tipo: "cambiar", indice }),
 };

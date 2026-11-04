@@ -9,11 +9,15 @@
 // Eventos que envía el cliente (todos con respuesta "ack" { ok, partida } o { ok:false, error, mensaje }):
 //   partida:crear            -> RF-11
 //   partida:unirse { id }    -> RF-13
-//   partida:abandonar        -> RF-14
+//   partida:abandonar        -> RF-14 (durante el combate, lo pierde: RF-18)
+//   combate:equipo { criaturas: [ids] }               -> RF-16
+//   combate:accion { tipo: "atacar", movimiento }     -> RF-17
+//   combate:accion { tipo: "cambiar", indice }        -> RF-17
 // Eventos que envía el servidor:
 //   partidas (lista)         -> RF-12, a todos cada vez que cambia
 //   partida:estado (partida) -> a los jugadores de una partida cuando cambia
 //   partida:rival-abandona   -> al jugador que se queda solo
+//   combate:estado (vista)   -> a cada jugador, SU vista del combate (RNF-10: nunca la del rival)
 
 const { Server } = require("socket.io");
 const { leerCookie, NOMBRE_COOKIE } = require("./sesiones.js");
@@ -64,6 +68,14 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
 
   const difundirLista = () => io.emit("partidas", salas.listarAbiertas());
 
+  // Cada jugador recibe su propia vista del combate: la del rival nunca sale del servidor.
+  const avisarCombate = (emails) => {
+    for (const e of emails) {
+      const vista = salas.vistaCombate(e);
+      if (vista) io.to(salaDeUsuario(e)).emit("combate:estado", vista);
+    }
+  };
+
   io.on("connection", (socket) => {
     const { email } = socket.data.jugador;
     socket.join(salaDeUsuario(email));
@@ -75,6 +87,8 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     if (actual) {
       socket.join(salaDePartida(actual.id));
       socket.emit("partida:estado", actual);
+      const vista = salas.vistaCombate(email);
+      if (vista) socket.emit("combate:estado", vista);
     }
 
     // Envuelve cada evento: comprueba la sesión, ejecuta la acción y responde por el ack.
@@ -115,6 +129,7 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       if (r.partida) {
         io.to(salaDePartida(r.id)).emit("partida:rival-abandona", r.partida);
         io.to(salaDePartida(r.id)).emit("partida:estado", r.partida);
+        avisarCombate(r.restantes); // si había combate, el que queda ve que ha ganado
       }
       registro.info("partida abandonada", { usuario: email, partida: r.id, eliminada: !r.partida });
       difundirLista();
@@ -135,11 +150,25 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       await entrarEnSala(partida);
       registro.info("jugador unido a partida", { usuario: email, partida: partida.id });
       io.to(salaDePartida(partida.id)).emit("partida:estado", partida);
+      avisarCombate(salas.participantesDe(partida.id));
       difundirLista();
       return partida;
     });
 
     manejar("partida:abandonar", async () => abandonar());
+
+    // RF-16 y RF-17: la lógica valida y resuelve; aquí solo se avisa a los dos jugadores.
+    manejar("combate:equipo", async ({ criaturas }) => {
+      const id = salas.elegirEquipo(email, criaturas);
+      avisarCombate(salas.participantesDe(id));
+      return null;
+    });
+
+    manejar("combate:accion", async (accion) => {
+      const id = salas.elegirAccion(email, accion);
+      avisarCombate(salas.participantesDe(id));
+      return null;
+    });
 
     // Si el jugador pierde su última conexión y no vuelve en el margen, sale de la partida.
     socket.on("disconnect", () => {

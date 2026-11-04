@@ -112,3 +112,51 @@ h3 { margin: 16px 0 8px; font-size: 1rem; }
 form.en-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0; border: 0; margin-top: 12px; background: none; }
 form.en-linea input { width: 8rem; text-transform: uppercase; }
 button[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* ---------- combate (hito 6) ---------- */
+:root {
+  --fuego: #d9480f; --agua: #1c7ed6; --planta: #2f9e44;
+  --rayo: #e0a800; --tierra: #8d6e3f; --viento: #0ca678; --neutro: #868e96;
+}
+.partida-cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.partida-cabecera h3 { margin: 0; }
+.partida-cabecera button { margin-left: auto; }
+.combate { margin-top: 12px; }
+.elemento { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; color: #fff; vertical-align: middle; }
+.elem-fuego { background: var(--fuego); } .elem-agua { background: var(--agua); } .elem-planta { background: var(--planta); }
+.elem-rayo { background: var(--rayo); color: #1d2330; } .elem-tierra { background: var(--tierra); } .elem-viento { background: var(--viento); }
+.elem-neutro { background: var(--neutro); }
+.elem-borde-fuego { border-left: 6px solid var(--fuego); } .elem-borde-agua { border-left: 6px solid var(--agua); }
+.elem-borde-planta { border-left: 6px solid var(--planta); } .elem-borde-rayo { border-left: 6px solid var(--rayo); }
+.elem-borde-tierra { border-left: 6px solid var(--tierra); } .elem-borde-viento { border-left: 6px solid var(--viento); }
+.rejilla-criaturas { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); margin: 12px 0; }
+.tarjeta-criatura { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; color: var(--texto); background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
+.tarjeta-criatura.marcada { outline: 3px solid var(--primario); background: var(--info-fondo); }
+.tarjeta-criatura .stats, .tarjeta-criatura .movs { font-size: 0.8rem; }
+.tarjeta-criatura .descripcion { font-size: 0.8rem; }
+.ficha-nombre { font-weight: 600; margin: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.campo-batalla { display: grid; gap: 12px; grid-template-columns: 1fr; margin-bottom: 12px; }
+@media (min-width: 640px) { .campo-batalla { grid-template-columns: 1fr 1fr; } }
+.ficha { background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
+.ficha.debilitada { opacity: 0.55; }
+.ficha-titulo { margin: 0 0 4px; font-size: 0.8rem; color: var(--suave); }
+.ps { position: relative; height: 20px; margin-top: 8px; background: var(--borde); border-radius: 999px; overflow: hidden; }
+.ps-relleno { height: 100%; transition: width 0.4s ease; }
+.ps-alta { background: #2f9e44; } .ps-media { background: #e0a800; } .ps-baja { background: #e03131; }
+.ps-texto { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 600; color: #fff; text-shadow: 0 0 3px #000; }
+.estado { font-size: 0.75rem; padding: 1px 8px; border-radius: 999px; border: 1px solid currentColor; }
+.estado-quemado { color: var(--fuego); } .estado-congelado { color: var(--agua); } .estado-paralizado { color: var(--rayo); }
+.movimientos { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); margin-bottom: 10px; }
+.mov { display: flex; flex-direction: column; align-items: flex-start; border: 0; color: #fff; }
+.elem-fondo-fuego { background: var(--fuego); } .elem-fondo-agua { background: var(--agua); } .elem-fondo-planta { background: var(--planta); }
+.elem-fondo-rayo { background: var(--rayo); color: #1d2330; } .elem-fondo-tierra { background: var(--tierra); } .elem-fondo-viento { background: var(--viento); }
+.elem-fondo-neutro { background: var(--neutro); }
+.mov-detalle { font-size: 0.75rem; opacity: 0.9; }
+.banquillo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.registro { margin: 0; padding-left: 20px; }
+.registro li { margin: 2px 0; }
+.aviso-error { color: var(--error-texto); background: var(--error-fondo); padding: 6px 10px; border-radius: 6px; }
+.resultado { text-align: center; padding: 16px; border-radius: 8px; border: 1px solid var(--borde); }
+.resultado-titulo { font-size: 1.6rem; font-weight: 700; margin: 0 0 8px; }
+.resultado-yo { background: var(--ok-fondo); color: var(--ok-texto); }
+.resultado-rival { background: var(--error-fondo); color: var(--error-texto); }

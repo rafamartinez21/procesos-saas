@@ -126,14 +126,18 @@ test("si el único jugador abandona, la partida desaparece", () => {
   esperarError(() => salas.obtener("P1"), "PARTIDA_NO_ENCONTRADA");
 });
 
-test("si abandona uno de dos, la partida vuelve a estar abierta para el que queda", () => {
+test("si abandona uno de dos durante el combate, gana el otro y la partida no vuelve a la lista (RF-18)", () => {
   salas.crearPartida(ana);
   salas.unirse("P1", luis);
   const r = salas.abandonar("ana@test.es");
   assert.deepEqual(r.restantes, ["luis@test.es"]);
-  assert.equal(r.partida.estado, "abierta");
-  assert.equal(r.partida.creador, "Luis");
-  assert.deepEqual(salas.listarAbiertas().map((p) => p.id), ["P1"]);
+  assert.equal(r.partida.estado, "terminada");
+  assert.deepEqual(salas.listarAbiertas(), []);
+  const v = salas.vistaCombate("luis@test.es");
+  assert.deepEqual([v.ganador, v.motivo], ["yo", "abandono"]);
+  // Cuando el que queda también sale, la partida desaparece.
+  assert.equal(salas.abandonar("luis@test.es").partida, null);
+  esperarError(() => salas.obtener("P1"), "PARTIDA_NO_ENCONTRADA");
 });
 
 test("tras abandonar, el jugador puede crear otra partida", () => {
@@ -144,4 +148,56 @@ test("tras abandonar, el jugador puede crear otra partida", () => {
 
 test("[error] no se puede abandonar si no se está en ninguna partida", () => {
   esperarError(() => salas.abandonar("ana@test.es"), "NO_EN_PARTIDA");
+});
+
+// ---------- combate dentro de la partida (hito 6) ----------
+
+function partidaCompleta(opciones = {}) {
+  let n = 0;
+  const terminadas = [];
+  const s = new Salas({ generarId: () => `P${++n}`, aleatorio: () => 0.5, alTerminar: (r) => terminadas.push(r), ...opciones });
+  s.crearPartida(ana);
+  s.unirse("P1", luis);
+  return { s, terminadas };
+}
+
+test("con dos jugadores empieza el combate en la fase de elegir equipo", () => {
+  const { s } = partidaCompleta();
+  assert.equal(s.vistaCombate("ana@test.es").fase, "seleccion");
+  assert.equal(s.vistaCombate("otro@test.es"), null);
+  assert.deepEqual(s.participantesDe("P1"), ["ana@test.es", "luis@test.es"]);
+});
+
+test("una partida abierta aún no tiene combate", () => {
+  salas.crearPartida(ana);
+  assert.equal(salas.vistaCombate("ana@test.es"), null);
+  esperarError(() => salas.elegirEquipo("ana@test.es", ["pirolince", "brason", "voltarda"]), "NO_EN_COMBATE");
+  esperarError(() => salas.elegirAccion("luis@test.es", { tipo: "atacar", movimiento: "embestida" }), "NO_EN_COMBATE");
+});
+
+test("elegir equipo y acciones se delega en el combate de la partida", () => {
+  const { s } = partidaCompleta();
+  assert.equal(s.elegirEquipo("ana@test.es", ["pirolince", "brason", "voltarda"]), "P1");
+  s.elegirEquipo("luis@test.es", ["marejon", "musgolem", "rocadonte"]);
+  assert.equal(s.vistaCombate("luis@test.es").fase, "combate");
+  s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "embestida" });
+  s.elegirAccion("luis@test.es", { tipo: "atacar", movimiento: "embestida" });
+  assert.equal(s.vistaCombate("ana@test.es").turno, 2);
+});
+
+test("al terminar el combate la partida queda terminada y se avisa una sola vez con el resultado", () => {
+  const { s, terminadas } = partidaCompleta();
+  s.elegirEquipo("ana@test.es", ["pirolince", "brason", "voltarda"]);
+  s.elegirEquipo("luis@test.es", ["marejon", "musgolem", "rocadonte"]);
+  s.abandonar("luis@test.es");
+  assert.equal(s.obtener("P1").estado, "terminada");
+  s.abandonar("ana@test.es");
+  assert.equal(terminadas.length, 1);
+  assert.deepEqual(terminadas[0], {
+    id: "P1",
+    jugadores: [{ email: "ana@test.es", nombre: "Ana" }, { email: "luis@test.es", nombre: "Luis" }],
+    ganador: "ana@test.es",
+    motivo: "abandono",
+    turnos: 1,
+  });
 });
