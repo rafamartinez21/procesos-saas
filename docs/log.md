@@ -4,6 +4,14 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-04 | Etiqueta `hito-6` | [hito-6](https://github.com/rafamartinez21/procesos-saas/tree/hito-6) |
+| 2026-11-04 | Etiqueta `hito-5` sobre el merge del PR #21 | [hito-5](https://github.com/rafamartinez21/procesos-saas/tree/hito-5) |
+| 2026-11-04 | Hito 6: combate en tiempo real y pantalla de combate | [PR #24](https://github.com/rafamartinez21/procesos-saas/pull/24) |
+| 2026-11-04 | RF-16 a RF-18 y RNF-10: motor de combate por turnos (D-23) | [PR #23](https://github.com/rafamartinez21/procesos-saas/pull/23) |
+| 2026-11-04 | RF-15: catálogo de criaturas y tabla de eficacias (D-22) | [PR #22](https://github.com/rafamartinez21/procesos-saas/pull/22) |
+| 2026-11-04 | Hito 5: partidas en tiempo real con Socket.IO (RF-11 a RF-14, RNF-09) | [PR #21](https://github.com/rafamartinez21/procesos-saas/pull/21) |
+| 2026-11-04 | RF-11 a RF-14: lógica de las salas de partida | [PR #20](https://github.com/rafamartinez21/procesos-saas/pull/20) |
+| 2026-11-04 | Plan del Sprint 2: Ecos de Aetheria, hitos 5 a 8 y decisiones D-19 a D-21 | [PR #19](https://github.com/rafamartinez21/procesos-saas/pull/19) |
 | 2026-10-29 | RF-04: inicio de sesión con Google (OAuth); un email con cuenta local se rechaza | [PR #18](https://github.com/rafamartinez21/procesos-saas/pull/18) |
 | 2026-10-29 | RF-02: confirmación de cuenta por correo con Brevo y reenvío del enlace | [PR #17](https://github.com/rafamartinez21/procesos-saas/pull/17) |
 | 2026-10-29 | Bundle OKF del Sprint 1 en `docs/` | [PR #16](https://github.com/rafamartinez21/procesos-saas/pull/16) |
