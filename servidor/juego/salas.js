@@ -59,6 +59,7 @@ function vistaPublica(partida) {
     jugadores: partida.jugadores.map((j) => j.nombre),
     plazas: JUGADORES_POR_PARTIDA - partida.jugadores.length,
     creada: partida.creada,
+    espectadores: partida.espectadores ? partida.espectadores.size : 0,
   };
 }
 
@@ -66,7 +67,8 @@ function vistaPublica(partida) {
 // alTerminar(resultado): se llama una vez por combate terminado con
 //   { id, jugadores: [{email, nombre}] , ganador: email|null, motivo, turnos }.
 function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatorio = Math.random, alTerminar = () => {} } = {}) {
-  const partidas = new Map(); // id -> { id, estado, jugadores: [{email, nombre}], creada, combate, participantes }
+  const partidas = new Map(); // id -> { id, estado, jugadores: [{email, nombre}], creada, combate, participantes, espectadores }
+  const observando = new Map(); // email del espectador -> id de la partida (RF-23)
 
   // Partida interna (con emails) en la que está un jugador, o undefined.
   const buscarDe = (email) => {
@@ -83,7 +85,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   };
 
   const exigirLibre = (email) => {
-    if (buscarDe(email)) {
+    if (buscarDe(email) || observando.has(email)) {
       throw new ErrorNegocio("YA_EN_PARTIDA", "Ya estás en una partida; abandónala antes de entrar en otra");
     }
   };
@@ -238,7 +240,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
 
   // Últimos mensajes del chat de la partida del jugador (para quien se reconecta).
   this.chatDe = function (email) {
-    const partida = buscarDe(email);
+    const partida = buscarDe(email) || partidas.get(observando.get(email));
     return partida && partida.chat ? partida.chat.map((m) => ({ ...m })) : [];
   };
 
@@ -263,10 +265,59 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
     // La máquina no se queda sola en una partida: si sale el humano, la partida desaparece.
     partida.jugadores = partida.jugadores.filter((j) => j.email !== email && !esMaquina(j.email));
     if (partida.jugadores.length === 0) {
+      // Los espectadores se quedan sin partida que mirar.
+      const espectadores = partida.espectadores ? [...partida.espectadores.keys()] : [];
+      for (const e of espectadores) observando.delete(e);
       partidas.delete(partida.id);
-      return { id: partida.id, partida: null, restantes: [] };
+      return { id: partida.id, partida: null, restantes: [], espectadores };
     }
-    return { id: partida.id, partida: vistaPublica(partida), restantes: partida.jugadores.map((j) => j.email) };
+    return { id: partida.id, partida: vistaPublica(partida), restantes: partida.jugadores.map((j) => j.email), espectadores: [] };
+  };
+
+  // ---------- RF-23: espectadores ----------
+
+  // Partidas con combate (en curso o recién terminadas) que se pueden mirar.
+  this.listarEnCurso = function () {
+    return [...partidas.values()]
+      .filter((p) => p.estado === ESTADO_COMPLETA)
+      .sort((a, b) => a.creada - b.creada)
+      .map(vistaPublica);
+  };
+
+  const nombresDe = (partida) => Object.fromEntries(partida.participantes.map((j) => [j.email, j.nombre]));
+
+  this.observar = function (id, espectador) {
+    const j = validarJugador(espectador);
+    const partida = buscar(id);
+    if (partida.participantes && partida.participantes.some((x) => x.email === j.email)) {
+      throw new ErrorNegocio("YA_EN_PARTIDA", "Juegas en esta partida");
+    }
+    if (buscarDe(j.email)) throw new ErrorNegocio("YA_EN_PARTIDA", "Sal de tu partida antes de mirar otra");
+    if (!partida.combate) throw new ErrorNegocio("PARTIDA_SIN_COMBATE", "Esa partida aún no ha empezado");
+    if (observando.has(j.email)) this.dejarDeObservar(j.email);
+    partida.espectadores = partida.espectadores || new Map();
+    partida.espectadores.set(j.email, j);
+    observando.set(j.email, partida.id);
+    return { id: partida.id, vista: partida.combate.vistaEspectador(nombresDe(partida)) };
+  };
+
+  this.dejarDeObservar = function (email) {
+    const id = observando.get(email);
+    if (!id) throw new ErrorNegocio("NO_OBSERVANDO", "No estás mirando ninguna partida");
+    observando.delete(email);
+    const partida = partidas.get(id);
+    if (partida && partida.espectadores) partida.espectadores.delete(email);
+    return id;
+  };
+
+  this.observandoDe = function (email) {
+    return observando.get(email) || null;
+  };
+
+  // Vista para espectadores de una partida, o null si ya no existe o no tiene combate.
+  this.vistaEspectador = function (id) {
+    const partida = partidas.get(id);
+    return partida && partida.combate ? partida.combate.vistaEspectador(nombresDe(partida)) : null;
   };
 
   // Emails de los jugadores (solo para la capa de tiempo real, que avisa a cada uno).

@@ -336,3 +336,55 @@ test("[error] chat: sin partida o con un mensaje vacío, se rechaza", async () =
   await emitir(eva, "partida:crear");
   assert.equal((await emitir(eva, "chat:enviar", { texto: "  " })).error, "MENSAJE_INVALIDO");
 });
+
+// ---------- RF-23 ----------
+
+test("espectador: ve la partida en la lista de en curso, la mira y recibe cada turno sin la vista de los jugadores", async () => {
+  const { ana, luis, partida } = await enCombate();
+  const eva = await clienteDe("eva@test.es");
+  const enCurso = await esperarQue(eva, "partidas:en-curso", (l) => l.length === 1);
+  assert.equal(enCurso[0].id, partida.id);
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"] });
+  await emitir(luis, "combate:equipo", { criaturas: ["marejon", "musgolem", "rocadonte"] });
+
+  let recibioVistaDeJugador = false;
+  eva.on("combate:estado", () => (recibioVistaDeJugador = true));
+  const primera = esperar(eva, "espectador:estado");
+  assert.equal((await emitir(eva, "partida:observar", { id: partida.id })).ok, true);
+  assert.deepEqual((await primera).jugadores.map((j) => j.nombre), ["Ana", "Luis"]);
+
+  const turno = esperarQue(eva, "espectador:estado", (v) => v.turno === 2);
+  await emitir(ana, "combate:accion", { tipo: "atacar", movimiento: "embestida" });
+  await emitir(luis, "combate:accion", { tipo: "atacar", movimiento: "embestida" });
+  const v = await turno;
+  assert.deepEqual(v.eventos.map((e) => e.quien), ["Ana", "Luis"]);
+  assert.equal(JSON.stringify(v).includes("@"), false);
+  assert.equal(recibioVistaDeJugador, false);
+});
+
+test("espectador: lee el chat de la partida", async () => {
+  const { ana, partida } = await enCombate();
+  const eva = await clienteDe("eva@test.es");
+  await listo(eva);
+  await emitir(eva, "partida:observar", { id: partida.id });
+  const llega = esperar(eva, "chat:mensaje");
+  await emitir(ana, "chat:enviar", { texto: "¡Hola, público!" });
+  assert.equal((await llega).texto, "¡Hola, público!");
+});
+
+test("[error] espectador: un jugador no puede mirar su propia partida", async () => {
+  const { ana, partida } = await enCombate();
+  assert.equal((await emitir(ana, "partida:observar", { id: partida.id })).error, "YA_EN_PARTIDA");
+});
+
+test("espectador: cuando los dos jugadores salen, recibe el aviso de fin", async () => {
+  const { ana, luis, partida } = await enCombate();
+  const eva = await clienteDe("eva@test.es");
+  await listo(eva);
+  await emitir(eva, "partida:observar", { id: partida.id });
+  const fin = esperar(eva, "espectador:fin");
+  await emitir(ana, "partida:abandonar");
+  await emitir(luis, "partida:abandonar");
+  await fin;
+  assert.equal(salas.observandoDe("eva@test.es"), null);
+});

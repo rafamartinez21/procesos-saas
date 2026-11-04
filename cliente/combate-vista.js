@@ -197,4 +197,67 @@ export function dibujarCombate(vista, { catalogo, seleccion, acciones }) {
   return pantallaCombate(vista, acciones);
 }
 
-export { textoEvento };
+// ---------- espectador (RF-23) ----------
+
+// Texto de un evento para quien mira: "quien" es el nombre del jugador.
+function textoEventoEspectador(ev) {
+  const de = (quien, criatura) => `${criatura} de ${quien}`;
+  switch (ev.tipo) {
+    case "cambio":
+      return `${ev.quien} saca a ${ev.criatura}.`;
+    case "ataque": {
+      const ef = ev.eficacia === 2 ? " ¡Es muy eficaz!" : ev.eficacia === 0.5 ? " No es muy eficaz…" : "";
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} contra ${ev.objetivo}: ${ev.danio} de daño.${ef}`;
+    }
+    case "falla":
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento}, pero falla.`;
+    case "estado":
+      return `${de(ev.quien, ev.criatura)} queda ${ESTADO[ev.estado].toLowerCase()}.`;
+    case "no-actua":
+      return `${de(ev.quien, ev.criatura)} está ${ESTADO[ev.estado].toLowerCase()} y no puede moverse.`;
+    case "descongela":
+      return `${de(ev.quien, ev.criatura)} se descongela.`;
+    case "quemadura":
+      return `${de(ev.quien, ev.criatura)} sufre ${ev.danio} de daño por la quemadura.`;
+    case "drena":
+      return `${de(ev.quien, ev.criatura)} recupera ${ev.cura} PS.`;
+    case "debilitada":
+      return `${de(ev.quien, ev.criatura)} se ha debilitado.`;
+    case "fin":
+      if (ev.motivo === "empate") return "¡Empate!";
+      if (ev.motivo === "abandono") return `${ev.ganador} gana porque su rival ha abandonado.`;
+      return `¡${ev.ganador} gana el combate!`;
+    default:
+      return "";
+  }
+}
+
+export function dibujarEspectador(vista, { salir }) {
+  const fichas = vista.jugadores.map((j) =>
+    j.activa
+      ? fichaCriatura(j.activa, `${j.nombre} · le quedan ${j.restantes}${vista.fase === "combate" && j.eleccionHecha ? " · ya ha elegido" : ""}`)
+      : el("div", { class: "ficha" }, el("p", { class: "ficha-titulo" }, j.nombre), el("p", { class: "suave" }, j.eleccionHecha ? "Equipo elegido" : "Eligiendo equipo…"))
+  );
+  const estado =
+    vista.fase === "terminada"
+      ? el("p", { class: "aviso-ok" }, vista.ganador ? `Ganador: ${vista.ganador}` : "Empate")
+      : el("p", { class: "suave" }, vista.fase === "seleccion" ? "Los jugadores están eligiendo equipo…" : `Turno ${vista.turno}`);
+  return el(
+    "div",
+    { class: "partida-actual espectador" },
+    el(
+      "div",
+      { class: "partida-cabecera" },
+      el("h3", {}, "Mirando: ", vista.jugadores.map((j) => j.nombre).join(" contra ")),
+      el("button", { type: "button", class: "secundario", onclick: salir }, "Dejar de mirar")
+    ),
+    estado,
+    el("div", { class: "campo-batalla" }, ...fichas),
+    el("h3", {}, "Último turno"),
+    vista.eventos.length
+      ? el("ol", { class: "registro", "aria-live": "polite" }, ...vista.eventos.map((ev) => el("li", {}, textoEventoEspectador(ev))))
+      : el("p", { class: "suave" }, "Aún no ha pasado nada.")
+  );
+}
+
+export { textoEvento, textoEventoEspectador };

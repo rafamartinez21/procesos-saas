@@ -32,7 +32,8 @@ function accion(evento, datos) {
 
 export const ClienteJuego = {
   // avisos: { alCambiarLista(partidas), alCambiarPartida(partida), alAbandonarRival(partida),
-  //           alCambiarCombate(vista), alRecibirMensaje(m), alRecibirHistorialChat(lista), alDesconectar(motivo) }
+  //           alCambiarCombate(vista), alRecibirMensaje(m), alRecibirHistorialChat(lista),
+//           alCambiarEnCurso(lista), alCambiarEspectador(vista), alTerminarEspectador(), alDesconectar(motivo) }
   conectar(avisos = {}) {
     this.desconectar();
     socket = io({ transports: ["websocket", "polling"] });
@@ -41,6 +42,9 @@ export const ClienteJuego = {
     socket.on("partida:rival-abandona", (p) => avisos.alAbandonarRival && avisos.alAbandonarRival(p));
     socket.on("combate:estado", (v) => avisos.alCambiarCombate && avisos.alCambiarCombate(v));
     socket.on("chat:mensaje", (m) => avisos.alRecibirMensaje && avisos.alRecibirMensaje(m));
+    socket.on("partidas:en-curso", (l) => avisos.alCambiarEnCurso && avisos.alCambiarEnCurso(l));
+    socket.on("espectador:estado", (v) => avisos.alCambiarEspectador && avisos.alCambiarEspectador(v));
+    socket.on("espectador:fin", () => avisos.alTerminarEspectador && avisos.alTerminarEspectador());
     socket.on("chat:historial", (lista) => avisos.alRecibirHistorialChat && avisos.alRecibirHistorialChat(lista));
     socket.on("connect_error", (err) => avisos.alDesconectar && avisos.alDesconectar(err.message));
     socket.on("disconnect", (motivo) => avisos.alDesconectar && avisos.alDesconectar(motivo));
@@ -60,4 +64,6 @@ export const ClienteJuego = {
   atacar: (movimiento) => accion("combate:accion", { tipo: "atacar", movimiento }),
   cambiar: (indice) => accion("combate:accion", { tipo: "cambiar", indice }),
   enviarMensaje: (texto) => accion("chat:enviar", { texto }),
+  observar: (id) => accion("partida:observar", { id }),
+  dejarDeObservar: () => accion("partida:dejar-observar"),
 };

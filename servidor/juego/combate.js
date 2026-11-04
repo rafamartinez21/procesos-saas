@@ -268,6 +268,37 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     this.eventos = [{ tipo: "fin", ganador: this.ganador, motivo: this.motivo }];
   };
 
+  // ---------- Vista de un espectador (RF-23) ----------
+  // Ve a los dos jugadores por igual: la criatura en combate, cuántas le quedan y si ya ha
+  // elegido, pero nunca el banquillo ni la acción elegida (así no puede chivarla).
+  // nombres: { email: nombre visible }. No incluye emails.
+  this.vistaEspectador = function (nombres) {
+    const nombre = (e) => (e ? nombres[e] || "?" : null);
+    const lado = (e) => {
+      const j = jugadores.get(e);
+      const c = j.equipo && this.fase !== FASE_SELECCION ? activa(j) : null;
+      return {
+        nombre: nombre(e),
+        activa: c ? { id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado } : null,
+        restantes: j.equipo ? vivas(j) : null,
+        eleccionHecha: this.fase === FASE_SELECCION ? Boolean(j.equipo) : Boolean(j.accion),
+      };
+    };
+    return {
+      fase: this.fase,
+      turno: this.turno,
+      jugadores: emails.map(lado),
+      eventos: this.eventos.map((ev) => {
+        const copia = { ...ev };
+        if ("quien" in copia) copia.quien = nombre(copia.quien);
+        if ("ganador" in copia) copia.ganador = nombre(copia.ganador);
+        return copia;
+      }),
+      ganador: this.fase === FASE_TERMINADA ? nombre(this.ganador) : null,
+      motivo: this.motivo,
+    };
+  };
+
   // ---------- Vista de un jugador (RNF-10) ----------
   // Cada jugador ve su equipo completo, pero del rival solo la criatura en combate y cuántas
   // le quedan, y nunca la acción que ha elegido (solo si ya ha elegido). Los emails se
