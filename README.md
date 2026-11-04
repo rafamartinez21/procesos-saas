@@ -2,7 +2,7 @@
 
 Aplicación web tipo SaaS organizada en capas: gestión de usuarios (Sprint 1) y el juego multijugador en tiempo real **Ecos de Aetheria** (Sprint 2), duelos por turnos entre criaturas elementales originales.
 
-**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 en curso: hitos 5 (salas de partida en tiempo real), 6 (combate por turnos) y 7 (historial, ranking ELO y estadísticas) completos. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
+**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 completo (hitos 5 a 8): salas de partida en tiempo real, combate por turnos, historial con ranking ELO y estadísticas, rival máquina, chat, modo espectador y reconexión. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
