@@ -2,7 +2,7 @@
 
 Aplicación web tipo SaaS organizada en capas: gestión de usuarios (Sprint 1) y el juego multijugador en tiempo real **Ecos de Aetheria** (Sprint 2), duelos por turnos entre criaturas elementales originales.
 
-**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 en curso: hitos 5 (salas de partida en tiempo real) y 6 (combate por turnos) completos. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
+**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 en curso: hitos 5 (salas de partida en tiempo real), 6 (combate por turnos) y 7 (historial, ranking ELO y estadísticas) completos. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
@@ -34,6 +34,7 @@ cliente/                  Frontend (se sirve desde el mismo origen que la API)
   cliente-api.js          Cliente de comunicación: único sitio que habla con la API REST (fetch).
   cliente-juego.js        Cliente de tiempo real: único sitio que usa Socket.IO.
   combate-vista.js        Presentación del combate: dibuja la vista que envía el servidor.
+  progreso-vista.js       Presentación del progreso: estadísticas, últimas partidas y ranking.
   dom.js                  Utilidad de dibujo (crea elementos con textContent).
   estilos.css
 servidor/
@@ -41,6 +42,7 @@ servidor/
   juego/salas.js          Lógica del juego: salas de partida (crear, listar, unirse, abandonar). Sin Socket.IO.
   juego/criaturas.js      Lógica del juego: catálogo de criaturas, movimientos y tabla de eficacias.
   juego/combate.js        Lógica del juego: motor de combate por turnos (equipos, daño, estados, ganador).
+  juego/progreso.js       Lógica del juego: historial, ranking ELO y estadísticas (usa el CAD).
   api.js                  Capa API: HTTP <-> lógica. Cookies de sesión y rutas protegidas. Sin reglas de negocio.
   sesiones.js             Sesiones (identificador -> usuario) en memoria, y cookies. Parte de la capa API.
   sesiones-mongo.js       Mismas sesiones, guardadas en MongoDB (caducan solas con un índice TTL).
@@ -143,6 +145,12 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 4. Si cae una criatura, su dueño saca otra. Gana quien deja al rival sin criaturas; rendirse o abandonar da la victoria al rival.
 
 Todo se calcula en el servidor; el navegador solo envía la acción elegida y nunca recibe la del rival antes de resolver el turno.
+
+## Progreso y ranking (hito 7)
+
+- Cada combate terminado se guarda en MongoDB (colección `partidas`) con los dos jugadores, el ganador, el motivo, los turnos y la puntuación de antes y de después.
+- Ranking ELO (D-24): todos empiezan con 1000; ganar a alguien mejor da más puntos. Abandonar cuenta como derrota.
+- El panel «Tu progreso» muestra tu ELO, partidas, porcentaje de victorias, racha, tus últimas partidas y el ranking, y se actualiza solo al terminar cada combate. A otros jugadores solo se les muestra tu nombre.
 
 ## Limitaciones conocidas
 

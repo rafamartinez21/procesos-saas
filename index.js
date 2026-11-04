@@ -13,6 +13,7 @@ const { crearRegistro } = require("./servidor/registro.js");
 const { crearCorreoBrevo, correoDeConfirmacion } = require("./servidor/correo-brevo.js");
 const { crearOAuthGoogle } = require("./servidor/oauth-google.js");
 const { Salas } = require("./servidor/juego/salas.js");
+const { Progreso } = require("./servidor/juego/progreso.js");
 const { conectarTiempoReal } = require("./servidor/tiempo-real.js");
 
 const PORT = process.env.PORT || 3000;
@@ -78,13 +79,25 @@ async function main() {
     : null;
   if (!oauthGoogle) registro.aviso("GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET no definidas: el inicio de sesión con Google no estará disponible");
 
-  const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA, oauthGoogle });
+  // Progreso del juego (hito 7): historial, ranking ELO y estadísticas, en el mismo CAD.
+  const progreso = new Progreso(cad);
+
+  const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA, oauthGoogle, progreso });
   const servidor = app.listen(PORT, () => {
     registro.info("servidor arrancado", { puerto: Number(PORT) });
   });
   // Partidas en tiempo real con Socket.IO sobre el mismo servidor (D-19). Las partidas en
   // curso viven en memoria (D-21).
-  conectarTiempoReal(servidor, { sistema, salas: new Salas(), sesiones, registro });
+  // Cada combate terminado se guarda en el historial y actualiza el ELO de los dos jugadores.
+  const salas = new Salas({
+    alTerminar: (resultado) => {
+      progreso.registrarResultado(resultado).then(
+        (r) => registro.info("partida registrada", { partida: resultado.id, motivo: resultado.motivo, elo: r.eloDespues }),
+        (err) => registro.error("no se pudo registrar la partida", { partida: resultado.id, error: String(err && err.stack || err) })
+      );
+    },
+  });
+  conectarTiempoReal(servidor, { sistema, salas, sesiones, registro });
 }
 
 main().catch((err) => {

@@ -10,10 +10,19 @@
 //   actualizarUsuario(email, cambios)   -> usuario | undefined
 //   eliminarUsuario(email)              -> true si existía, false si no
 //   buscarUsuarioPorToken(hash)         -> usuario | undefined (por tokenConfirmacion)
+// Juego (hito 7):
+//   insertarPartida(partida)            -> partida terminada { id, emails: [a, b], fecha, ... }
+//   listarPartidasDe(email, limite)     -> [partida] en las que jugó, de la más reciente a la más antigua
+//   buscarJugador(email)                -> { email, nombre, elo, ganadas, perdidas, empates } | undefined
+//   guardarJugador(jugador)             -> jugador (lo crea o lo sustituye)
+//   listarRanking(limite)               -> [jugador] por elo de mayor a menor (empate: más ganadas)
+//   eliminarJugador(email)              -> true si existía, false si no
 // Todos son async para que cambiar a una base de datos no obligue a tocar la lógica.
 
 function CadMemoria() {
   this.usuarios = new Map(); // clave: email
+  this.partidas = []; // partidas terminadas
+  this.jugadores = new Map(); // clave: email
 
   // Se guardan y devuelven copias para que la lógica no pueda modificar el almacén
   // sin pasar por estos métodos (igual que pasaría con una base de datos).
@@ -53,5 +62,42 @@ function CadMemoria() {
     return undefined;
   };
 }
+
+// Orden del ranking: más elo primero; a igual elo, más victorias; después, por email
+// para que el orden sea estable.
+function ordenRanking(a, b) {
+  return b.elo - a.elo || b.ganadas - a.ganadas || (a.email < b.email ? -1 : 1);
+}
+
+CadMemoria.prototype.insertarPartida = async function (partida) {
+  this.partidas.push(structuredClone(partida));
+  return structuredClone(partida);
+};
+
+CadMemoria.prototype.listarPartidasDe = async function (email, limite = 20) {
+  return this.partidas
+    .filter((p) => p.emails.includes(email))
+    .sort((a, b) => b.fecha - a.fecha)
+    .slice(0, limite)
+    .map((p) => structuredClone(p));
+};
+
+CadMemoria.prototype.buscarJugador = async function (email) {
+  const j = this.jugadores.get(email);
+  return j ? { ...j } : undefined;
+};
+
+CadMemoria.prototype.guardarJugador = async function (jugador) {
+  this.jugadores.set(jugador.email, { ...jugador });
+  return { ...jugador };
+};
+
+CadMemoria.prototype.listarRanking = async function (limite = 20) {
+  return [...this.jugadores.values()].sort(ordenRanking).slice(0, limite).map((j) => ({ ...j }));
+};
+
+CadMemoria.prototype.eliminarJugador = async function (email) {
+  return this.jugadores.delete(email);
+};
 
 module.exports = { CadMemoria };

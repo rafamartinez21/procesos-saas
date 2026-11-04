@@ -160,3 +160,13 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 .resultado-titulo { font-size: 1.6rem; font-weight: 700; margin: 0 0 8px; }
 .resultado-yo { background: var(--ok-fondo); color: var(--ok-texto); }
 .resultado-rival { background: var(--error-fondo); color: var(--error-texto); }
+
+/* ---------- progreso y ranking (hito 7) ---------- */
+section.progreso { margin-bottom: 16px; }
+.datos { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); margin-bottom: 12px; }
+.dato { display: flex; flex-direction: column; align-items: center; padding: 10px; background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; }
+.dato-valor { font-size: 1.5rem; font-weight: 700; }
+.dato-etiqueta { font-size: 0.8rem; color: var(--suave); }
+.res-victoria { color: var(--ok-texto); font-weight: 600; }
+.res-derrota { color: var(--error-texto); font-weight: 600; }
+tr.fila-mia td { background: var(--info-fondo); font-weight: 600; }

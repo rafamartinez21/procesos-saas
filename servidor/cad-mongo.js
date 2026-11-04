@@ -8,6 +8,13 @@
 //   actualizarUsuario(email, cambios)   -> usuario | undefined
 //   eliminarUsuario(email)              -> true si existía, false si no
 //   buscarUsuarioPorToken(hash)         -> usuario | undefined (por tokenConfirmacion)
+// Juego (hito 7):
+//   insertarPartida(partida)            -> partida terminada { id, emails: [a, b], fecha, ... }
+//   listarPartidasDe(email, limite)     -> [partida] en las que jugó, de la más reciente a la más antigua
+//   buscarJugador(email)                -> { email, nombre, elo, ganadas, perdidas, empates } | undefined
+//   guardarJugador(jugador)             -> jugador (lo crea o lo sustituye)
+//   listarRanking(limite)               -> [jugador] por elo de mayor a menor (empate: más ganadas)
+//   eliminarJugador(email)              -> true si existía, false si no
 //
 // Además tiene conectar() y cerrar(), que solo usa quien ensambla las capas (index.js).
 // La cadena de conexión llega por parámetro: este archivo no lee variables de entorno
@@ -34,6 +41,12 @@ function CadMongo(url, { nombreBD = "sistema" } = {}) {
     // El índice único es el que garantiza que no haya dos usuarios con el mismo email,
     // incluso si llegan dos registros a la vez.
     await this.usuarios.createIndex({ email: 1 }, { unique: true });
+    // Juego (hito 7): historial por jugador y fecha, y ranking por elo.
+    this.partidas = this.bd.collection("partidas");
+    this.jugadores = this.bd.collection("jugadores");
+    await this.partidas.createIndex({ emails: 1, fecha: -1 });
+    await this.jugadores.createIndex({ email: 1 }, { unique: true });
+    await this.jugadores.createIndex({ elo: -1, ganadas: -1, email: 1 });
   };
 
   this.cerrar = async function () {
@@ -84,5 +97,33 @@ function CadMongo(url, { nombreBD = "sistema" } = {}) {
     return u || undefined;
   };
 }
+
+CadMongo.prototype.insertarPartida = async function (partida) {
+  await this.partidas.insertOne({ ...partida });
+  return { ...partida };
+};
+
+CadMongo.prototype.listarPartidasDe = async function (email, limite = 20) {
+  return this.partidas.find({ emails: email }, SIN_ID).sort({ fecha: -1 }).limit(limite).toArray();
+};
+
+CadMongo.prototype.buscarJugador = async function (email) {
+  const j = await this.jugadores.findOne({ email }, SIN_ID);
+  return j || undefined;
+};
+
+CadMongo.prototype.guardarJugador = async function (jugador) {
+  await this.jugadores.replaceOne({ email: jugador.email }, { ...jugador }, { upsert: true });
+  return { ...jugador };
+};
+
+CadMongo.prototype.listarRanking = async function (limite = 20) {
+  return this.jugadores.find({}, SIN_ID).sort({ elo: -1, ganadas: -1, email: 1 }).limit(limite).toArray();
+};
+
+CadMongo.prototype.eliminarJugador = async function (email) {
+  const r = await this.jugadores.deleteOne({ email });
+  return r.deletedCount === 1;
+};
 
 module.exports = { CadMongo };
