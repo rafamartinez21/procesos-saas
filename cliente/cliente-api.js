@@ -64,6 +64,7 @@ export const ClienteApi = {
     }
   },
   listarUsuarios: () => peticion("GET", "/api/usuarios"),
+  criaturas: () => peticion("GET", "/api/criaturas"),
   usuarioActivo: async (email) => (await peticion("GET", `/api/usuarios/${encodeURIComponent(email)}/activo`)).activo,
   eliminarUsuario: (email) => peticion("DELETE", `/api/usuarios/${encodeURIComponent(email)}`),
 };

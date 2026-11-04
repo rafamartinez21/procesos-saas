@@ -23,9 +23,9 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 
 | Capa | Archivo | Responsabilidad |
 |---|---|---|
-| Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. |
+| Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego. |
 | Comunicación | [cliente/cliente-api.js](../cliente/cliente-api.js) | Único archivo que llama a `fetch`. Expone `ClienteApi` y convierte los errores HTTP en `ErrorApi`. |
-| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `unirse`, `abandonar`) y convierte los rechazos en `ErrorJuego`. |
+| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`) y convierte los rechazos en `ErrorJuego`. |
 
 **Frontera:** `interfaz.js` importa `ClienteApi` y solo llama a sus funciones (`registrar`, `iniciarSesion`, `cerrarSesion`, `sesionActual`, `listarUsuarios`, `usuarioActivo`, `eliminarUsuario`). No conoce URLs, cabeceras ni cookies. Igual con `ClienteJuego`: la interfaz no conoce los nombres de los eventos.
 
@@ -38,7 +38,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | API (tiempo real) | [servidor/tiempo-real.js](../servidor/tiempo-real.js) | Socket.IO sobre el mismo servidor HTTP (D-19). Autentica con la cookie `sid`, traduce eventos a llamadas a `Salas` y difunde el estado. Sin reglas del juego (D-20). |
 | API (sesiones) | [servidor/sesiones.js](../servidor/sesiones.js), [servidor/sesiones-mongo.js](../servidor/sesiones-mongo.js) | Sesiones en memoria o en MongoDB, con la misma interfaz, y cookies `HttpOnly`. |
 | Lógica de negocio | [servidor/modelo.js](../servidor/modelo.js) | `Sistema`: reglas de usuarios, roles, registro, inicio de sesión, confirmación y validación de email. Lanza `ErrorNegocio` con un código estable. |
-| Lógica del juego | [servidor/juego/salas.js](../servidor/juego/salas.js) | `Salas`: crear, listar, unirse a y abandonar partidas (hito 5). Sin Socket.IO ni HTTP (D-20); las partidas viven en memoria (D-21). Las vistas públicas no incluyen emails. |
+| Lógica del juego | [servidor/juego/salas.js](../servidor/juego/salas.js) | `Salas`: crear, listar, unirse a y abandonar partidas (hito 5); con dos jugadores crea el `Combate` de la partida y avisa con `alTerminar` cuando acaba. Sin Socket.IO ni HTTP (D-20); las partidas viven en memoria (D-21). Las vistas públicas no incluyen emails. |
 | Lógica del juego | [servidor/juego/criaturas.js](../servidor/juego/criaturas.js) | Catálogo de criaturas, movimientos, estados y tabla de eficacias (D-22). Datos fijos sin dependencias. |
 | Lógica del juego | [servidor/juego/combate.js](../servidor/juego/combate.js) | `Combate`: elección de equipos, turnos simultáneos (D-23), daño, eficacias, estados alterados y ganador. Valida cada acción y da a cada jugador una vista sin la acción ni el banquillo del rival (RNF-10). El azar se inyecta. |
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
@@ -82,7 +82,10 @@ Definidos en [servidor/tiempo-real.js](../servidor/tiempo-real.js). La conexión
 |---|---|---|
 | Cliente → servidor | `partida:crear` | Crea una partida abierta (RF-11) |
 | Cliente → servidor | `partida:unirse` `{ id }` | Se une a una partida (RF-13) |
-| Cliente → servidor | `partida:abandonar` | Sale de su partida (RF-14) |
+| Cliente → servidor | `partida:abandonar` | Sale de su partida (RF-14); durante el combate, lo pierde (RF-18) |
+| Cliente → servidor | `combate:equipo` `{ criaturas }` | Elige su equipo de tres (RF-16) |
+| Cliente → servidor | `combate:accion` `{ tipo, movimiento \| indice }` | Ataca o cambia de criatura (RF-17) |
 | Servidor → todos | `partidas` | Lista de partidas abiertas, en cada cambio (RF-12) |
 | Servidor → jugadores | `partida:estado` | Estado de su partida cuando cambia |
 | Servidor → jugador | `partida:rival-abandona` | Su rival ha salido |
+| Servidor → jugador | `combate:estado` | Su propia vista del combate, en cada cambio (RNF-10: la del rival nunca sale del servidor) |

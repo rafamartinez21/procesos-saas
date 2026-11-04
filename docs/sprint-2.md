@@ -30,10 +30,10 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 | ID | Requisito | Estado |
 |---|---|---|
 | RF-15 | Catálogo de criaturas con seis elementos y tabla de eficacias | hecho |
-| RF-16 | Elegir un equipo de tres criaturas antes del combate | parcial: motor en `servidor/juego/combate.js`, falta el tiempo real y la interfaz |
-| RF-17 | Turnos: atacar o cambiar de criatura, cálculo de daño y estados alterados | parcial: motor en `servidor/juego/combate.js`, falta el tiempo real y la interfaz |
-| RF-18 | Fin de la partida y ganador (o victoria si el rival abandona) | parcial: motor en `servidor/juego/combate.js`, falta el tiempo real y la interfaz |
-| RNF-10 | El servidor valida cada acción: un cliente no puede actuar fuera de turno ni inventar ataques | parcial: motor en `servidor/juego/combate.js`, falta el tiempo real y la interfaz |
+| RF-16 | Elegir un equipo de tres criaturas antes del combate | hecho |
+| RF-17 | Turnos: atacar o cambiar de criatura, cálculo de daño y estados alterados | hecho |
+| RF-18 | Fin de la partida y ganador (o victoria si el rival abandona) | hecho |
+| RNF-10 | El servidor valida cada acción: un cliente no puede actuar fuera de turno ni inventar ataques | hecho |
 
 ### Hito 7: progreso del jugador
 

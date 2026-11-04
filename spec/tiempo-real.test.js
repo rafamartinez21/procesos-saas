@@ -167,17 +167,20 @@ test("[error] un tercer jugador recibe PARTIDA_LLENA y una partida inexistente P
 
 // ---------- RF-14 ----------
 
-test("si un jugador abandona, el rival recibe el aviso y la partida vuelve a la lista", async () => {
+test("si un jugador abandona, el rival recibe el aviso y gana el combate (RF-18)", async () => {
   const ana = await clienteDe("ana@test.es");
   const luis = await clienteDe("luis@test.es");
   await Promise.all([listo(ana), listo(luis)]);
   const { partida } = await emitir(ana, "partida:crear");
   await emitir(luis, "partida:unirse", { id: partida.id });
   const aviso = esperar(ana, "partida:rival-abandona");
+  const victoria = esperarQue(ana, "combate:estado", (v) => v.fase === "terminada");
   const r = await emitir(luis, "partida:abandonar");
   assert.equal(r.ok, true);
   assert.deepEqual((await aviso).jugadores, ["Ana"]);
-  assert.deepEqual(salas.listarAbiertas().map((p) => p.id), [partida.id]);
+  const v = await victoria;
+  assert.deepEqual([v.ganador, v.motivo], ["yo", "abandono"]);
+  assert.deepEqual(salas.listarAbiertas(), []);
 });
 
 test("[error] abandonar sin estar en una partida devuelve NO_EN_PARTIDA", async () => {
@@ -221,4 +224,69 @@ test("si se vuelve a conectar dentro del margen (recargar la página), sigue en 
   assert.equal(estado.id, partida.id);
   await new Promise((r) => setTimeout(r, 120));
   assert.equal(salas.partidaDe("ana@test.es").id, partida.id);
+});
+
+// ---------- combate en tiempo real (hito 6) ----------
+
+// Dos jugadores en una partida completa, cada uno con su última vista del combate.
+async function enCombate() {
+  const ana = await clienteDe("ana@test.es");
+  const luis = await clienteDe("luis@test.es");
+  await Promise.all([listo(ana), listo(luis)]);
+  const { partida } = await emitir(ana, "partida:crear");
+  const seleccionAna = esperarQue(ana, "combate:estado", (v) => v.fase === "seleccion");
+  const seleccionLuis = esperarQue(luis, "combate:estado", (v) => v.fase === "seleccion");
+  await emitir(luis, "partida:unirse", { id: partida.id });
+  await Promise.all([seleccionAna, seleccionLuis]);
+  return { ana, luis, partida };
+}
+
+test("al completarse la partida, los dos reciben la fase de elegir equipo", async () => {
+  await enCombate();
+});
+
+test("elegir equipos y atacar: cada jugador recibe su propia vista del turno resuelto", async () => {
+  const { ana, luis } = await enCombate();
+  const empiezaAna = esperarQue(ana, "combate:estado", (v) => v.fase === "combate");
+  assert.equal((await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"] })).ok, true);
+  assert.equal((await emitir(luis, "combate:equipo", { criaturas: ["marejon", "musgolem", "rocadonte"] })).ok, true);
+  const v1 = await empiezaAna;
+  assert.equal(v1.rival.activa.nombre, "Marejón");
+
+  const turnoAna = esperarQue(ana, "combate:estado", (v) => v.turno === 2);
+  const turnoLuis = esperarQue(luis, "combate:estado", (v) => v.turno === 2);
+  await emitir(ana, "combate:accion", { tipo: "atacar", movimiento: "embestida" });
+  await emitir(luis, "combate:accion", { tipo: "atacar", movimiento: "embestida" });
+  const [vAna, vLuis] = await Promise.all([turnoAna, turnoLuis]);
+  assert.equal(vAna.eventos.length, 2);
+  assert.equal(vAna.eventos[0].quien, "yo", "Pirolince es más rápido");
+  assert.equal(vLuis.eventos[0].quien, "rival");
+  assert.equal(vAna.yo.equipo[0].id, "pirolince");
+  assert.equal(vLuis.yo.equipo[0].id, "marejon");
+});
+
+test("[error] RNF-10: un movimiento que la criatura no conoce se rechaza y el rival no recibe nada", async () => {
+  const { ana, luis } = await enCombate();
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"] });
+  await emitir(luis, "combate:equipo", { criaturas: ["marejon", "musgolem", "rocadonte"] });
+  const r = await emitir(ana, "combate:accion", { tipo: "atacar", movimiento: "golpe-final" });
+  assert.deepEqual([r.ok, r.error], [false, "MOVIMIENTO_INVALIDO"]);
+  assert.equal(salas.vistaCombate("luis@test.es").rival.eleccionHecha, false);
+});
+
+test("[error] sin estar en un combate, las acciones de combate se rechazan", async () => {
+  const eva = await clienteDe("eva@test.es");
+  await listo(eva);
+  assert.equal((await emitir(eva, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"] })).error, "NO_EN_COMBATE");
+  assert.equal((await emitir(eva, "combate:accion", { tipo: "atacar", movimiento: "embestida" })).error, "NO_EN_COMBATE");
+});
+
+test("al volver a conectarse en mitad del combate se recibe la vista del combate", async () => {
+  const { ana, luis } = await enCombate();
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"] });
+  await emitir(luis, "combate:equipo", { criaturas: ["marejon", "musgolem", "rocadonte"] });
+  const otraPestana = await clienteDe("ana@test.es");
+  const v = await esperar(otraPestana, "combate:estado");
+  assert.equal(v.fase, "combate");
+  assert.equal(v.yo.equipo.length, 3);
 });

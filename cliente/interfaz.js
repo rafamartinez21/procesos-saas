@@ -8,21 +8,13 @@
 
 import { ClienteApi } from "./cliente-api.js";
 import { ClienteJuego } from "./cliente-juego.js";
+import { el } from "./dom.js";
+import { dibujarCombate } from "./combate-vista.js";
 
 const raiz = document.getElementById("app");
 const zonaMensaje = document.getElementById("mensaje");
 
 // ---------- utilidades de dibujo ----------
-
-function el(etiqueta, atributos = {}, ...hijos) {
-  const nodo = document.createElement(etiqueta);
-  for (const [clave, valor] of Object.entries(atributos)) {
-    if (clave === "onclick" || clave === "onsubmit") nodo[clave] = valor;
-    else nodo.setAttribute(clave, valor);
-  }
-  for (const hijo of hijos) nodo.append(hijo);
-  return nodo;
-}
 
 function mostrarMensaje(texto, tipo = "info") {
   zonaMensaje.textContent = texto;
@@ -150,13 +142,44 @@ async function pantallaPrincipal(usuario) {
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
 function panelVestibulo() {
-  const estado = { lista: [], partida: null, conectado: false };
+  const estado = { lista: [], partida: null, combate: null, conectado: false, catalogo: [], seleccion: [] };
   const zona = el("section", { class: "vestibulo" });
+
+  // El catálogo de criaturas solo hace falta para elegir equipo; se pide una vez.
+  ClienteApi.criaturas().then((c) => {
+    estado.catalogo = c;
+    dibujar();
+  }, mostrarError);
+
+  // Acciones del combate: el servidor responde con el nuevo estado por "combate:estado".
+  const enCombate = async (fn) => {
+    try {
+      await fn();
+    } catch (err) {
+      mostrarError(err);
+    }
+  };
+  const accionesCombate = {
+    alternarSeleccion: (id) => {
+      const i = estado.seleccion.indexOf(id);
+      if (i >= 0) estado.seleccion.splice(i, 1);
+      else if (estado.seleccion.length < 3) estado.seleccion.push(id);
+      dibujar();
+    },
+    confirmarEquipo: () => enCombate(() => ClienteJuego.elegirEquipo(estado.seleccion)),
+    atacar: (movimiento) => enCombate(() => ClienteJuego.atacar(movimiento)),
+    cambiar: (indice) => enCombate(() => ClienteJuego.cambiar(indice)),
+    salir: () => ejecutar(() => ClienteJuego.abandonar()),
+  };
 
   const ejecutar = async (fn) => {
     try {
       const partida = await fn();
       estado.partida = partida;
+      if (!partida) {
+        estado.combate = null;
+        estado.seleccion = [];
+      }
       dibujar();
     } catch (err) {
       mostrarError(err);
@@ -179,15 +202,33 @@ function panelVestibulo() {
   }
 
   function panelPartida(p) {
-    const rival = p.jugadores.length < 2 ? "Esperando rival…" : `Jugadores: ${p.jugadores.join(" contra ")}`;
+    const rival = p.jugadores.length < 2 ? "Esperando rival…" : `${p.jugadores.join(" contra ")}`;
+    const enCurso = estado.combate && estado.combate.fase !== "terminada";
     return el(
       "div",
       { class: "partida-actual" },
-      el("h3", {}, "Tu partida"),
-      el("p", {}, "Código: ", el("strong", { class: "codigo" }, p.id), " (compártelo con tu rival)"),
-      el("p", {}, rival),
-      p.estado === "completa" ? el("p", { class: "aviso-ok" }, "¡Rival encontrado! El combate llega en el hito 6.") : "",
-      el("button", { type: "button", class: "peligro", onclick: () => ejecutar(() => ClienteJuego.abandonar()) }, "Abandonar partida")
+      el(
+        "div",
+        { class: "partida-cabecera" },
+        el("h3", {}, "Partida ", el("span", { class: "codigo" }, p.id)),
+        el("span", { class: "suave" }, rival),
+        estado.combate && estado.combate.fase === "terminada"
+          ? null
+          : el(
+              "button",
+              {
+                type: "button",
+                class: "peligro",
+                onclick: () => {
+                  if (enCurso && !confirm("Si abandonas, pierdes el combate. ¿Seguro?")) return;
+                  ejecutar(() => ClienteJuego.abandonar());
+                },
+              },
+              enCurso ? "Rendirse" : "Abandonar partida"
+            )
+      ),
+      p.jugadores.length < 2 ? el("p", {}, "Comparte el código ", el("strong", { class: "codigo" }, p.id), " con tu rival o espera a que alguien se una.") : null,
+      estado.combate ? dibujarCombate(estado.combate, { catalogo: estado.catalogo, seleccion: estado.seleccion, acciones: accionesCombate }) : null
     );
   }
 
@@ -216,6 +257,10 @@ function panelVestibulo() {
     } else {
       hijos.push(el("button", { type: "button", onclick: () => ejecutar(() => ClienteJuego.crearPartida()) }, "Crear partida"), formUnirse());
     }
+    if (estado.partida && estado.combate) {
+      zona.replaceChildren(...hijos);
+      return; // durante el combate no se muestra la lista de partidas
+    }
     hijos.push(el("h3", {}, "Partidas abiertas"));
     const ajenas = estado.lista.filter((p) => !estado.partida || p.id !== estado.partida.id);
     hijos.push(ajenas.length ? el("ul", { class: "lista-partidas" }, ...ajenas.map(tarjetaPartida)) : el("p", { class: "suave" }, "No hay partidas abiertas. ¡Crea una!"));
@@ -232,10 +277,15 @@ function panelVestibulo() {
       estado.partida = p;
       dibujar();
     },
-    alAbandonarRival: () => mostrarMensaje("Tu rival ha abandonado la partida. Sigue abierta para otro jugador.", "info"),
+    alCambiarCombate: (v) => {
+      estado.combate = v;
+      if (v.fase !== "seleccion") estado.seleccion = [];
+      dibujar();
+    },
+    alAbandonarRival: () => mostrarMensaje("Tu rival ha abandonado la partida.", "info"),
     alDesconectar: () => {
+      // Socket.IO se vuelve a conectar solo; al volver, el servidor reenvía partida y combate.
       estado.conectado = false;
-      estado.partida = null;
       dibujar();
     },
   });
