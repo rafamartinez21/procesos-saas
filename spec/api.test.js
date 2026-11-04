@@ -62,6 +62,13 @@ test("la API responde y sirve la página", async () => {
   assert.equal(res.status, 200);
 });
 
+test("GET /api/criaturas devuelve el catálogo de doce criaturas con sus movimientos (RF-15)", async () => {
+  const r = await llamar("GET", "/api/criaturas");
+  assert.equal(r.estado, 200);
+  assert.equal(r.cuerpo.length, 12);
+  assert.equal(typeof r.cuerpo[0].movimientos[0].potencia, "number");
+});
+
 test("[error] las rutas protegidas rechazan peticiones sin sesión (401)", async () => {
   assert.equal((await llamar("GET", "/api/usuarios")).estado, 401);
   assert.equal((await llamar("GET", "/api/sesion")).estado, 401);

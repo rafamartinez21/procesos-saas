@@ -133,3 +133,9 @@ timestamp: 2026-10-28
 - **Qué se decidió:** las partidas abiertas y en curso se guardan en memoria del servidor. Solo el resultado de cada partida terminada se guarda en MongoDB (hito 7).
 - **Por qué:** una partida dura minutos y cambia en cada turno; guardarla en la base de datos en cada acción añade latencia sin beneficio. Consecuencia: el servicio de Cloud Run debe ejecutarse con una sola instancia para que los dos jugadores lleguen al mismo proceso. Por verificar: número máximo de instancias igual a 1 en la configuración de Cloud Run.
 - **Estado:** vigente.
+
+## D-22 El catálogo de criaturas es código, no datos de la base de datos
+
+- **Qué se decidió:** las criaturas, sus movimientos y la tabla de eficacias están en [servidor/juego/criaturas.js](../servidor/juego/criaturas.js). El cliente las pide con `GET /api/criaturas`.
+- **Por qué:** son reglas del juego, no datos de los usuarios: cambian con una versión del código, se revisan en un pull request y las pruebas comprueban su equilibrio (dos criaturas por elemento, estadísticas que suman 280, cada elemento eficaz contra dos y débil contra dos). En la base de datos no tendrían esas comprobaciones.
+- **Estado:** vigente.
