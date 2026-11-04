@@ -14,10 +14,10 @@ Se sigue GitHub Flow ([README](../README.md#flujo-de-trabajo)):
 1. Una rama por cambio desde `main`, con un prefijo según el tipo: `feat/`, `ci/` o `docs/`.
 2. Pruebas en local con `npm test` antes de abrir el pull request.
 3. Pull request contra `main`, que se integra con un commit de merge cuando la CI está en verde.
-4. Al terminar cada hito se pone una etiqueta en `main`: `hito-1`, `hito-2` y `hito-3`.
+4. Al terminar cada hito se pone una etiqueta en `main`: `hito-1`, `hito-2`, `hito-3`, `hito-5` y `hito-6`.
 
 **Evidencia:**
-- 15 pull requests, todos integrados (`gh pr list --state all`).
+- 24 pull requests, todos integrados (`gh pr list --state all`).
 - En `git log --first-parent main`, todos los commits son merges de pull requests, salvo el commit inicial `583a961`.
 
 Por verificar: si la protección de la rama `main` está activada (Settings → Branches en GitHub).
@@ -32,8 +32,8 @@ Por verificar: si la protección de la rama `main` está activada (Settings → 
   2. instala Node 22;
   3. instala las dependencias con `npm ci`, que respeta las versiones exactas de `package-lock.json`;
   4. ejecuta `npm test`.
-- **Pruebas:** `npm test` ejecuta 131. Las de MongoDB usan `mongodb-memory-server`, así que la CI no necesita secretos ni acceso a Atlas.
-- **Resultados:** las 30 ejecuciones registradas están en verde (`gh run list --limit 50`).
+- **Pruebas:** `npm test` ejecuta 208. Las de MongoDB usan `mongodb-memory-server` y las de tiempo real arrancan el servidor en un puerto libre con el cliente oficial de Socket.IO, así que la CI no necesita secretos ni acceso a Atlas.
+- **Resultados:** las 51 ejecuciones registradas están en verde (`gh run list --limit 100`).
 
 ## Despliegue continuo
 
