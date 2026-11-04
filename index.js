@@ -12,6 +12,8 @@ const { SesionesMongo } = require("./servidor/sesiones-mongo.js");
 const { crearRegistro } = require("./servidor/registro.js");
 const { crearCorreoBrevo, correoDeConfirmacion } = require("./servidor/correo-brevo.js");
 const { crearOAuthGoogle } = require("./servidor/oauth-google.js");
+const { Salas } = require("./servidor/juego/salas.js");
+const { conectarTiempoReal } = require("./servidor/tiempo-real.js");
 
 const PORT = process.env.PORT || 3000;
 
@@ -77,9 +79,12 @@ async function main() {
   if (!oauthGoogle) registro.aviso("GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET no definidas: el inicio de sesión con Google no estará disponible");
 
   const app = crearApp(sistema, { sesiones, registro, urlPublica: process.env.URL_PUBLICA, oauthGoogle });
-  app.listen(PORT, () => {
+  const servidor = app.listen(PORT, () => {
     registro.info("servidor arrancado", { puerto: Number(PORT) });
   });
+  // Partidas en tiempo real con Socket.IO sobre el mismo servidor (D-19). Las partidas en
+  // curso viven en memoria (D-21).
+  conectarTiempoReal(servidor, { sistema, salas: new Salas(), sesiones, registro });
 }
 
 main().catch((err) => {

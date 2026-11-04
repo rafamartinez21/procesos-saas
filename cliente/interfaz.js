@@ -7,6 +7,7 @@
 // con innerHTML, para que un nombre malicioso no pueda inyectar código en la página.
 
 import { ClienteApi } from "./cliente-api.js";
+import { ClienteJuego } from "./cliente-juego.js";
 
 const raiz = document.getElementById("app");
 const zonaMensaje = document.getElementById("mensaje");
@@ -127,6 +128,7 @@ async function pantallaPrincipal(usuario) {
         type: "button",
         onclick: async () => {
           try {
+            ClienteJuego.desconectar();
             await ClienteApi.cerrarSesion();
             mostrarMensaje("Has cerrado la sesión.", "ok");
             await arrancar(false);
@@ -140,7 +142,105 @@ async function pantallaPrincipal(usuario) {
   );
 
   const contenido = usuario.rol === "admin" ? await panelAdministrador(usuario) : panelUsuario(usuario);
-  raiz.replaceChildren(cabecera, contenido);
+  raiz.replaceChildren(cabecera, panelVestibulo(), contenido);
+}
+
+// ---------- vestíbulo de partidas (hito 5) ----------
+// Lista en directo de partidas abiertas, crear, unirse y abandonar. Los nombres de los
+// jugadores se insertan con textContent (función el), nunca con innerHTML.
+
+function panelVestibulo() {
+  const estado = { lista: [], partida: null, conectado: false };
+  const zona = el("section", { class: "vestibulo" });
+
+  const ejecutar = async (fn) => {
+    try {
+      const partida = await fn();
+      estado.partida = partida;
+      dibujar();
+    } catch (err) {
+      mostrarError(err);
+    }
+  };
+
+  function tarjetaPartida(p) {
+    const yaEnUna = Boolean(estado.partida);
+    return el(
+      "li",
+      { class: "partida" },
+      el("span", { class: "codigo" }, p.id),
+      el("span", {}, `Creada por ${p.creador}`),
+      el(
+        "button",
+        { type: "button", onclick: () => ejecutar(() => ClienteJuego.unirse(p.id)), ...(yaEnUna ? { disabled: "" } : {}) },
+        "Unirse"
+      )
+    );
+  }
+
+  function panelPartida(p) {
+    const rival = p.jugadores.length < 2 ? "Esperando rival…" : `Jugadores: ${p.jugadores.join(" contra ")}`;
+    return el(
+      "div",
+      { class: "partida-actual" },
+      el("h3", {}, "Tu partida"),
+      el("p", {}, "Código: ", el("strong", { class: "codigo" }, p.id), " (compártelo con tu rival)"),
+      el("p", {}, rival),
+      p.estado === "completa" ? el("p", { class: "aviso-ok" }, "¡Rival encontrado! El combate llega en el hito 6.") : "",
+      el("button", { type: "button", class: "peligro", onclick: () => ejecutar(() => ClienteJuego.abandonar()) }, "Abandonar partida")
+    );
+  }
+
+  function formUnirse() {
+    return el(
+      "form",
+      {
+        class: "en-linea",
+        onsubmit: (e) => {
+          e.preventDefault();
+          const id = new FormData(e.target).get("codigo");
+          ejecutar(() => ClienteJuego.unirse(id));
+        },
+      },
+      el("label", { for: "codigo-partida" }, "Código"),
+      el("input", { id: "codigo-partida", name: "codigo", required: "", maxlength: "8", autocomplete: "off" }),
+      el("button", { type: "submit", class: "secundario" }, "Unirse con código")
+    );
+  }
+
+  function dibujar() {
+    const hijos = [el("h2", {}, "Ecos de Aetheria: partidas")];
+    if (!estado.conectado) hijos.push(el("p", { class: "suave" }, "Conectando con el servidor de partidas…"));
+    if (estado.partida) {
+      hijos.push(panelPartida(estado.partida));
+    } else {
+      hijos.push(el("button", { type: "button", onclick: () => ejecutar(() => ClienteJuego.crearPartida()) }, "Crear partida"), formUnirse());
+    }
+    hijos.push(el("h3", {}, "Partidas abiertas"));
+    const ajenas = estado.lista.filter((p) => !estado.partida || p.id !== estado.partida.id);
+    hijos.push(ajenas.length ? el("ul", { class: "lista-partidas" }, ...ajenas.map(tarjetaPartida)) : el("p", { class: "suave" }, "No hay partidas abiertas. ¡Crea una!"));
+    zona.replaceChildren(...hijos);
+  }
+
+  ClienteJuego.conectar({
+    alCambiarLista: (lista) => {
+      estado.lista = lista;
+      estado.conectado = true;
+      dibujar();
+    },
+    alCambiarPartida: (p) => {
+      estado.partida = p;
+      dibujar();
+    },
+    alAbandonarRival: () => mostrarMensaje("Tu rival ha abandonado la partida. Sigue abierta para otro jugador.", "info"),
+    alDesconectar: () => {
+      estado.conectado = false;
+      estado.partida = null;
+      dibujar();
+    },
+  });
+  dibujar();
+  return zona;
 }
 
 function panelUsuario(usuario) {

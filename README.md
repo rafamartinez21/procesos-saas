@@ -1,8 +1,8 @@
-# Sistema — Procesos de Ingeniería del Software (Sprint 1)
+# Ecos de Aetheria — Procesos de Ingeniería del Software
 
-Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
+Aplicación web tipo SaaS organizada en capas: gestión de usuarios (Sprint 1) y el juego multijugador en tiempo real **Ecos de Aetheria** (Sprint 2), duelos por turnos entre criaturas elementales originales.
 
-**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Documentación del proyecto en [docs/](docs/index.md).
+**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 en curso: hito 5 (salas de partida en tiempo real). Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
@@ -22,6 +22,7 @@ Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 | Google OAuth 2.0 (sin librerías) | Inicio de sesión externo con el proveedor del material del curso; el flujo de código de autorización se implementa con `fetch` en un módulo propio, sin añadir dependencias. |
 | Brevo (API transaccional) | Envía el correo de confirmación con capa gratuita y por HTTPS, porque los proveedores cloud suelen bloquear el SMTP directo; no necesita dominio propio. |
 | `mongodb-memory-server` (solo pruebas) | MongoDB temporal en local: las pruebas del CAD y de las sesiones usan una base de datos de verdad sin tocar Atlas ni necesitar secretos. |
+| Socket.IO | Comunicación en tiempo real para las partidas (D-19), la misma librería que el material del curso; funciona sobre el servidor de Express y reconecta sola. |
 | Google Cloud Run | Despliegue sencillo desde el repositorio, con capa gratuita y URL pública con HTTPS. |
 
 ## Arquitectura
@@ -30,9 +31,12 @@ Aplicación web tipo SaaS organizada en capas, con gestión de usuarios.
 cliente/                  Frontend (se sirve desde el mismo origen que la API)
   index.html              Página
   interfaz.js             Capa de presentación (GUI): dibuja pantallas. No hace peticiones.
-  cliente-api.js          Cliente de comunicación: único sitio que habla con el servidor (fetch).
+  cliente-api.js          Cliente de comunicación: único sitio que habla con la API REST (fetch).
+  cliente-juego.js        Cliente de tiempo real: único sitio que usa Socket.IO.
   estilos.css
 servidor/
+  tiempo-real.js          Capa API en tiempo real (Socket.IO): eventos <-> lógica del juego. Exige la cookie de sesión.
+  juego/salas.js          Lógica del juego: salas de partida (crear, listar, unirse, abandonar). Sin Socket.IO.
   api.js                  Capa API: HTTP <-> lógica. Cookies de sesión y rutas protegidas. Sin reglas de negocio.
   sesiones.js             Sesiones (identificador -> usuario) en memoria, y cookies. Parte de la capa API.
   sesiones-mongo.js       Mismas sesiones, guardadas en MongoDB (caducan solas con un índice TTL).
@@ -120,9 +124,17 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 - Dos roles: `usuario` y `admin`. Listar usuarios y comprobar si uno está activo es solo del administrador; eliminar: el administrador a cualquiera y un usuario solo a sí mismo. Se comprueba en el servidor (`modelo.js`) y el rol se lee siempre de la base de datos, nunca de lo que envíe el cliente.
 - El log escribe una línea JSON por evento (arranque, peticiones, altas, inicios y cierres de sesión, eliminaciones, rechazos y errores inesperados). Se consulta en Cloud Logging, en los registros del servicio de Cloud Run.
 
+## Partidas en tiempo real (hito 5)
+
+- Con la sesión iniciada, la página se conecta por Socket.IO usando la misma cookie de sesión; sin sesión válida el servidor rechaza la conexión, y comprueba la sesión de nuevo en cada acción.
+- «Crear partida» genera un código corto (por ejemplo `K7Q2X`); la lista de partidas abiertas se actualiza en directo en todas las pantallas; se entra con «Unirse» o escribiendo el código.
+- Si un jugador abandona, el otro recibe un aviso y la partida vuelve a estar abierta. Si se pierde la conexión (recargar, corte de red), hay 30 segundos para volver antes de salir de la partida.
+- A los demás jugadores solo se les muestra el nombre, nunca el email.
+
 ## Limitaciones conocidas
 
 - Cada petición a la API busca la sesión en la base de datos; es suficiente para este proyecto.
+- Las partidas en curso viven en memoria (D-21): el servicio debe ejecutarse con una sola instancia y un reinicio del servidor termina las partidas abiertas.
 
 ## Flujo de trabajo
 

@@ -98,3 +98,17 @@ th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--bor
 th { font-size: 0.85rem; color: var(--suave); font-weight: 600; }
 p.separador { text-align: center; margin: 12px 0 8px; color: var(--suave, #888); }
 button.google { width: 100%; color: var(--texto, inherit); background: transparent; border-color: currentColor; }
+
+/* ---------- vestíbulo de partidas ---------- */
+section.vestibulo { margin-bottom: 16px; }
+h3 { margin: 16px 0 8px; font-size: 1rem; }
+.suave { color: var(--suave); }
+.codigo { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: 0.08em; font-weight: 600; }
+.lista-partidas { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.partida { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--borde); border-radius: 8px; }
+.partida button { margin-left: auto; }
+.partida-actual { padding: 12px; border: 1px dashed var(--primario); border-radius: 8px; }
+.aviso-ok { color: var(--ok-texto); background: var(--ok-fondo); padding: 6px 10px; border-radius: 6px; }
+form.en-linea { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0; border: 0; margin-top: 12px; background: none; }
+form.en-linea input { width: 8rem; text-transform: uppercase; }
+button[disabled] { opacity: 0.5; cursor: not-allowed; }
