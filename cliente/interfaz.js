@@ -257,7 +257,15 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
     if (estado.partida) {
       hijos.push(panelPartida(estado.partida));
     } else {
-      hijos.push(el("button", { type: "button", onclick: () => ejecutar(() => ClienteJuego.crearPartida()) }, "Crear partida"), formUnirse());
+      hijos.push(
+        el(
+          "div",
+          { class: "botones-vestibulo" },
+          el("button", { type: "button", onclick: () => ejecutar(() => ClienteJuego.crearPartida()) }, "Crear partida"),
+          el("button", { type: "button", class: "secundario", onclick: () => ejecutar(() => ClienteJuego.crearContraMaquina()) }, "Jugar contra la máquina")
+        ),
+        formUnirse()
+      );
     }
     if (estado.partida && estado.combate) {
       zona.replaceChildren(...hijos);

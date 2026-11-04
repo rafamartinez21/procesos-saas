@@ -25,7 +25,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 |---|---|---|
 | Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/progreso-vista.js](../cliente/progreso-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego y `progreso-vista.js`, el panel de estadísticas y ranking. |
 | Comunicación | [cliente/cliente-api.js](../cliente/cliente-api.js) | Único archivo que llama a `fetch`. Expone `ClienteApi` y convierte los errores HTTP en `ErrorApi`. |
-| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`) y convierte los rechazos en `ErrorJuego`. |
+| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `crearContraMaquina`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`) y convierte los rechazos en `ErrorJuego`. |
 
 **Frontera:** `interfaz.js` importa `ClienteApi` y solo llama a sus funciones (`registrar`, `iniciarSesion`, `cerrarSesion`, `sesionActual`, `listarUsuarios`, `usuarioActivo`, `eliminarUsuario`). No conoce URLs, cabeceras ni cookies. Igual con `ClienteJuego`: la interfaz no conoce los nombres de los eventos.
 
@@ -42,6 +42,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | Lógica del juego | [servidor/juego/criaturas.js](../servidor/juego/criaturas.js) | Catálogo de criaturas, movimientos, estados y tabla de eficacias (D-22). Datos fijos sin dependencias. |
 | Lógica del juego | [servidor/juego/combate.js](../servidor/juego/combate.js) | `Combate`: elección de equipos, turnos simultáneos (D-23), daño, eficacias, estados alterados y ganador. Valida cada acción y da a cada jugador una vista sin la acción ni el banquillo del rival (RNF-10). El azar se inyecta. |
 | Lógica del juego | [servidor/juego/progreso.js](../servidor/juego/progreso.js) | `Progreso`: guarda cada partida terminada, actualiza el ELO (D-24) y calcula historial, ranking y estadísticas. Recibe el CAD por parámetro, como `Sistema`. |
+| Lógica del juego | [servidor/juego/ia.js](../servidor/juego/ia.js) | Rival máquina (RF-25): funciones puras que reciben la vista de un jugador y devuelven una acción válida (D-25). |
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
 | Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`; y para el juego `insertarPartida`, `listarPartidasDe`, `buscarJugador`, `guardarJugador`, `listarRanking` y `eliminarJugador`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
@@ -85,6 +86,7 @@ Definidos en [servidor/tiempo-real.js](../servidor/tiempo-real.js). La conexión
 | Sentido | Evento | Qué hace |
 |---|---|---|
 | Cliente → servidor | `partida:crear` | Crea una partida abierta (RF-11) |
+| Cliente → servidor | `partida:crear-maquina` | Crea una partida contra la máquina (RF-25) |
 | Cliente → servidor | `partida:unirse` `{ id }` | Se une a una partida (RF-13) |
 | Cliente → servidor | `partida:abandonar` | Sale de su partida (RF-14); durante el combate, lo pierde (RF-18) |
 | Cliente → servidor | `combate:equipo` `{ criaturas }` | Elige su equipo de tres (RF-16) |

@@ -151,3 +151,9 @@ timestamp: 2026-10-28
 - **Qué se decidió:** cada jugador empieza con 1000 puntos. Tras cada partida, los dos jugadores cambian su puntuación con la fórmula ELO y factor K = 32: ganar a alguien mejor da muchos puntos y ganar a alguien peor, pocos. Abandonar cuenta como derrota y un empate entre iguales no cambia nada. La puntuación y el resultado se guardan en el momento en que termina el combate.
 - **Por qué:** un ranking por número de victorias premia a quien más juega, no a quien mejor juega. ELO es un sistema conocido, se calcula con una fórmula corta que se prueba con valores exactos y no necesita datos adicionales.
 - **Estado:** vigente.
+
+## D-25 La máquina juega con la misma información que un jugador y no puntúa
+
+- **Qué se decidió:** el rival máquina decide solo a partir de `Combate.vista`, la misma vista que recibe un jugador humano: no conoce la acción elegida ni el banquillo de su rival. Actúa en el servidor en cuanto le toca. Las partidas contra la máquina no se guardan en el historial ni cambian el ELO.
+- **Por qué:** si la máquina viera el estado completo haría trampas, y usar la vista demuestra que la vista basta para jugar. Si contaran para el ranking, se podría subir el ELO jugando contra la máquina en lugar de contra personas.
+- **Estado:** vigente.

@@ -201,3 +201,57 @@ test("al terminar el combate la partida queda terminada y se avisa una sola vez 
     turnos: 1,
   });
 });
+
+// ---------- RF-25 contra la máquina ----------
+
+test("contra la máquina la partida empieza completa, la máquina ya ha elegido equipo y no sale en la lista", () => {
+  const p = salas.crearPartidaContraMaquina(ana);
+  assert.equal(p.estado, "completa");
+  assert.deepEqual(p.jugadores, ["Ana", "Autómata de Aetheria"]);
+  assert.deepEqual(salas.listarAbiertas(), []);
+  const v = salas.vistaCombate("ana@test.es");
+  assert.equal(v.fase, "seleccion");
+  assert.equal(v.rival.equipoElegido, true);
+});
+
+test("contra la máquina, cada acción del jugador recibe respuesta inmediata", () => {
+  const { s } = partidaCompleta();
+  s.abandonar("ana@test.es");
+  s.abandonar("luis@test.es");
+  s.crearPartidaContraMaquina(ana);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "voltarda"]);
+  assert.equal(s.vistaCombate("ana@test.es").fase, "combate");
+  s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "embestida" });
+  const v = s.vistaCombate("ana@test.es");
+  assert.equal(v.turno, 2, "el turno se ha resuelto sin esperar");
+  assert.ok(v.eventos.some((e) => e.quien === "rival"));
+});
+
+test("una partida contra la máquina se puede jugar hasta el final y no cuenta para el ranking (D-25)", () => {
+  const { s, terminadas } = partidaCompleta();
+  s.abandonar("ana@test.es");
+  s.abandonar("luis@test.es");
+  terminadas.length = 0;
+  s.crearPartidaContraMaquina(ana);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "voltarda"]);
+  for (let i = 0; i < 300; i++) {
+    const v = s.vistaCombate("ana@test.es");
+    if (v.fase === "terminada") break;
+    if (v.yo.debeCambiar) s.elegirAccion("ana@test.es", { tipo: "cambiar", indice: v.yo.equipo.findIndex((c) => c.ps > 0) });
+    else if (!v.yo.eleccionHecha && !v.rival.debeCambiar) s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: v.yo.equipo[v.yo.activa].movimientos[0].id });
+  }
+  assert.equal(s.vistaCombate("ana@test.es").fase, "terminada");
+  assert.equal(s.obtener("P2").estado, "terminada");
+  assert.equal(terminadas.length, 0);
+});
+
+test("si el jugador sale de una partida contra la máquina, la partida desaparece", () => {
+  salas.crearPartidaContraMaquina(ana);
+  assert.equal(salas.abandonar("ana@test.es").partida, null);
+  assert.equal(salas.partidaDe("ana@test.es"), null);
+});
+
+test("[error] quien ya está en una partida no puede empezar otra contra la máquina", () => {
+  salas.crearPartida(ana);
+  esperarError(() => salas.crearPartidaContraMaquina(ana), "YA_EN_PARTIDA");
+});

@@ -290,3 +290,22 @@ test("al volver a conectarse en mitad del combate se recibe la vista del combate
   assert.equal(v.fase, "combate");
   assert.equal(v.yo.equipo.length, 3);
 });
+
+// ---------- RF-25 ----------
+
+test("partida contra la máquina: se crea, se elige equipo y cada ataque recibe respuesta", async () => {
+  const ana = await clienteDe("ana@test.es");
+  await listo(ana);
+  const seleccion = esperarQue(ana, "combate:estado", (v) => v.fase === "seleccion");
+  const r = await emitir(ana, "partida:crear-maquina");
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.partida.jugadores, ["Ana", "Autómata de Aetheria"]);
+  await seleccion;
+  const empieza = esperarQue(ana, "combate:estado", (v) => v.fase === "combate");
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "marejon", "voltarda"] });
+  await empieza;
+  const turno = esperarQue(ana, "combate:estado", (v) => v.turno === 2 || v.fase === "terminada");
+  await emitir(ana, "combate:accion", { tipo: "atacar", movimiento: "embestida" });
+  const v = await turno;
+  assert.ok(v.eventos.some((e) => e.quien === "rival"), "la máquina también ha actuado");
+});

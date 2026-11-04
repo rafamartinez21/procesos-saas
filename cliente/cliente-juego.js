@@ -51,6 +51,7 @@ export const ClienteJuego = {
     }
   },
   crearPartida: () => accion("partida:crear"),
+  crearContraMaquina: () => accion("partida:crear-maquina"),
   unirse: (id) => accion("partida:unirse", { id }),
   abandonar: () => accion("partida:abandonar"),
   elegirEquipo: (criaturas) => accion("combate:equipo", { criaturas }),

@@ -43,6 +43,7 @@ servidor/
   juego/criaturas.js      Lógica del juego: catálogo de criaturas, movimientos y tabla de eficacias.
   juego/combate.js        Lógica del juego: motor de combate por turnos (equipos, daño, estados, ganador).
   juego/progreso.js       Lógica del juego: historial, ranking ELO y estadísticas (usa el CAD).
+  juego/ia.js             Lógica del juego: rival controlado por la máquina.
   api.js                  Capa API: HTTP <-> lógica. Cookies de sesión y rutas protegidas. Sin reglas de negocio.
   sesiones.js             Sesiones (identificador -> usuario) en memoria, y cookies. Parte de la capa API.
   sesiones-mongo.js       Mismas sesiones, guardadas en MongoDB (caducan solas con un índice TTL).
@@ -143,6 +144,7 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 2. En cada turno los dos eligen a la vez y en secreto: atacar con uno de los movimientos de su criatura o cambiarla por otra del equipo. Los cambios van primero y los ataques, de la criatura más rápida a la más lenta.
 3. El daño depende de la potencia del movimiento, del ataque y la defensa, de si el movimiento es del elemento de la criatura (x1,25) y de la eficacia: cada elemento es muy eficaz (x2) contra dos y poco eficaz (x0,5) contra otros dos. Algunos movimientos queman, congelan o paralizan, y Drenaje cura al atacante.
 4. Si cae una criatura, su dueño saca otra. Gana quien deja al rival sin criaturas; rendirse o abandonar da la victoria al rival.
+5. Para jugar solo, «Jugar contra la máquina» empieza una partida contra el Autómata de Aetheria. Elige el movimiento más eficaz y cambia de criatura cuando le conviene, pero solo con la información que tendría un jugador (D-25). Estas partidas no cuentan para el ranking.
 
 Todo se calcula en el servidor; el navegador solo envía la acción elegida y nunca recibe la del rival antes de resolver el turno.
 
