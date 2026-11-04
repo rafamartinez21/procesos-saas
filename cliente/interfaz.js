@@ -10,6 +10,7 @@ import { ClienteApi } from "./cliente-api.js";
 import { ClienteJuego } from "./cliente-juego.js";
 import { el } from "./dom.js";
 import { dibujarCombate } from "./combate-vista.js";
+import { panelProgreso } from "./progreso-vista.js";
 
 const raiz = document.getElementById("app");
 const zonaMensaje = document.getElementById("mensaje");
@@ -134,14 +135,15 @@ async function pantallaPrincipal(usuario) {
   );
 
   const contenido = usuario.rol === "admin" ? await panelAdministrador(usuario) : panelUsuario(usuario);
-  raiz.replaceChildren(cabecera, panelVestibulo(), contenido);
+  const progreso = panelProgreso({ alError: mostrarError });
+  raiz.replaceChildren(cabecera, panelVestibulo({ alTerminarCombate: progreso.recargar }), progreso.nodo, contenido);
 }
 
 // ---------- vestíbulo de partidas (hito 5) ----------
 // Lista en directo de partidas abiertas, crear, unirse y abandonar. Los nombres de los
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
-function panelVestibulo() {
+function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
   const estado = { lista: [], partida: null, combate: null, conectado: false, catalogo: [], seleccion: [] };
   const zona = el("section", { class: "vestibulo" });
 
@@ -278,6 +280,8 @@ function panelVestibulo() {
       dibujar();
     },
     alCambiarCombate: (v) => {
+      // Al terminar, el servidor guarda el resultado y actualiza el ELO: se recarga el progreso.
+      if (v.fase === "terminada" && (!estado.combate || estado.combate.fase !== "terminada")) setTimeout(alTerminarCombate, 800);
       estado.combate = v;
       if (v.fase !== "seleccion") estado.seleccion = [];
       dibujar();

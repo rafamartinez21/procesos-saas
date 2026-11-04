@@ -90,6 +90,43 @@ function pruebasDeContrato(crearCad) {
     assert.equal((await cad.buscarUsuario("pepe@test.es")).rol, "usuario");
   });
 
+  // ---------- juego (hito 7) ----------
+
+  const partida = (id, emails, fecha) => ({ id, emails, fecha, ganador: emails[0], motivo: "sin-criaturas", turnos: 5 });
+  const jugador = (email, elo, ganadas = 0) => ({ email, nombre: email.split("@")[0], elo, ganadas, perdidas: 0, empates: 0 });
+
+  test("listarPartidasDe devuelve solo las del jugador, de la más reciente a la más antigua y con límite", async () => {
+    await cad.insertarPartida(partida("P1", ["a@test.es", "b@test.es"], 100));
+    await cad.insertarPartida(partida("P2", ["c@test.es", "a@test.es"], 300));
+    await cad.insertarPartida(partida("P3", ["b@test.es", "c@test.es"], 200));
+    assert.deepEqual((await cad.listarPartidasDe("a@test.es")).map((p) => p.id), ["P2", "P1"]);
+    assert.deepEqual((await cad.listarPartidasDe("a@test.es", 1)).map((p) => p.id), ["P2"]);
+    assert.deepEqual(await cad.listarPartidasDe("nadie@test.es"), []);
+    assert.deepEqual(await cad.listarPartidasDe("b@test.es", 5), [partida("P3", ["b@test.es", "c@test.es"], 200), partida("P1", ["a@test.es", "b@test.es"], 100)]);
+  });
+
+  test("guardarJugador crea o sustituye y buscarJugador lo devuelve", async () => {
+    assert.equal(await cad.buscarJugador("a@test.es"), undefined);
+    await cad.guardarJugador(jugador("a@test.es", 1000));
+    await cad.guardarJugador(jugador("a@test.es", 1016, 1));
+    assert.deepEqual(await cad.buscarJugador("a@test.es"), jugador("a@test.es", 1016, 1));
+  });
+
+  test("listarRanking ordena por elo y, a igual elo, por victorias", async () => {
+    await cad.guardarJugador(jugador("a@test.es", 1000, 1));
+    await cad.guardarJugador(jugador("b@test.es", 1100, 0));
+    await cad.guardarJugador(jugador("c@test.es", 1000, 3));
+    assert.deepEqual((await cad.listarRanking()).map((j) => j.email), ["b@test.es", "c@test.es", "a@test.es"]);
+    assert.deepEqual((await cad.listarRanking(2)).map((j) => j.email), ["b@test.es", "c@test.es"]);
+  });
+
+  test("eliminarJugador lo quita del ranking", async () => {
+    await cad.guardarJugador(jugador("a@test.es", 1000));
+    assert.equal(await cad.eliminarJugador("a@test.es"), true);
+    assert.equal(await cad.eliminarJugador("a@test.es"), false);
+    assert.deepEqual(await cad.listarRanking(), []);
+  });
+
   test("la lógica funciona sin cambios sobre este CAD", async () => {
     const sistema = new Sistema(cad, { autoConfirmar: true });
     await sistema.registrarUsuario({ email: "pepe@test.es", password: "claveSegura1" });
@@ -120,6 +157,8 @@ describe("CAD MongoDB", () => {
   // Antes de cada prueba se vacía la colección (el índice único se mantiene).
   pruebasDeContrato(async () => {
     await cad.usuarios.deleteMany({});
+    await cad.partidas.deleteMany({});
+    await cad.jugadores.deleteMany({});
     return cad;
   });
 

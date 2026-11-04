@@ -29,7 +29,8 @@ const ESTADO_HTTP = {
 // urlPublica: URL base del sitio para construir el enlace de confirmación. Si no se da, se
 // deduce de la petición (suficiente en local; en producción conviene fijarla).
 // oauthGoogle: cliente de Google (servicio externo) o null si no está configurado.
-function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro(), urlPublica, oauthGoogle = null } = {}) {
+// progreso: lógica del progreso del juego (historial, ranking y estadísticas, hito 7) o null.
+function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro(), urlPublica, oauthGoogle = null, progreso = null } = {}) {
   const app = express();
 
   // Cloud Run está detrás de un proxy que termina el HTTPS. Con esto, req.secure es
@@ -221,12 +222,37 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
   app.delete("/api/usuarios/:email", exigirSesion, asincrono(async (req, res) => {
     await sistema.eliminarUsuario(req.emailSesion, req.params.email);
     registro.info("usuario eliminado", { email: req.params.email.trim().toLowerCase(), por: req.emailSesion });
-    // Un usuario eliminado no puede seguir usando sus sesiones.
+    // Un usuario eliminado no puede seguir usando sus sesiones ni aparecer en el ranking.
     await sesiones.destruirDeUsuario(req.params.email.trim().toLowerCase());
+    if (progreso) await progreso.olvidarJugador(req.params.email.trim().toLowerCase());
     if (req.emailSesion === req.params.email.trim().toLowerCase()) {
       res.setHeader("Set-Cookie", cookieBorrada({ segura: req.secure }));
     }
     res.status(204).end();
+  }));
+
+  // ---------- Juego: progreso del jugador (hito 7) ----------
+  // Con sesión. Solo devuelven nombres visibles, nunca emails de otros jugadores.
+
+  const exigirProgreso = (req, res, next) => {
+    if (!progreso) return res.status(503).json({ error: "NO_DISPONIBLE", mensaje: "El progreso del juego no está disponible" });
+    next();
+  };
+
+  // RF-20: ranking por ELO (los 20 primeros).
+  app.get("/api/juego/ranking", exigirSesion, exigirProgreso, asincrono(async (req, res) => {
+    res.json(await progreso.ranking(20));
+  }));
+
+  // RF-19: historial de partidas del jugador con sesión.
+  app.get("/api/juego/historial", exigirSesion, exigirProgreso, asincrono(async (req, res) => {
+    res.json(await progreso.historial(req.emailSesion, 20));
+  }));
+
+  // RF-21: estadísticas del jugador con sesión.
+  app.get("/api/juego/estadisticas", exigirSesion, exigirProgreso, asincrono(async (req, res) => {
+    const yo = await sistema.perfil(req.emailSesion);
+    res.json(await progreso.estadisticas(yo.email, yo.nombre || yo.email.split("@")[0]));
   }));
 
   // Ruta de API desconocida

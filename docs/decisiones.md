@@ -145,3 +145,9 @@ timestamp: 2026-10-28
 - **Qué se decidió:** en cada turno los dos jugadores eligen su acción en secreto y el turno se resuelve cuando los dos han elegido. Primero se hacen los cambios de criatura y después los ataques, de la criatura más rápida a la más lenta (empate al azar). Si cae una criatura, su dueño saca otra antes del siguiente turno. Si los dos se quedan sin criaturas a la vez, es empate.
 - **Por qué:** con turnos alternos el segundo jugador vería la acción del primero y tendría ventaja. Elegir a la vez obliga a anticiparse al rival y, como el servidor no revela la acción elegida hasta resolver (RNF-10), nadie puede aprovecharse de ella.
 - **Estado:** vigente.
+
+## D-24 Puntuación ELO para el ranking
+
+- **Qué se decidió:** cada jugador empieza con 1000 puntos. Tras cada partida, los dos jugadores cambian su puntuación con la fórmula ELO y factor K = 32: ganar a alguien mejor da muchos puntos y ganar a alguien peor, pocos. Abandonar cuenta como derrota y un empate entre iguales no cambia nada. La puntuación y el resultado se guardan en el momento en que termina el combate.
+- **Por qué:** un ranking por número de victorias premia a quien más juega, no a quien mejor juega. ELO es un sistema conocido, se calcula con una fórmula corta que se prueba con valores exactos y no necesita datos adicionales.
+- **Estado:** vigente.

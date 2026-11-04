@@ -39,9 +39,9 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 
 | ID | Requisito | Estado |
 |---|---|---|
-| RF-19 | Historial de partidas guardado en MongoDB | pendiente |
-| RF-20 | Ranking con puntuación ELO | pendiente |
-| RF-21 | Perfil del jugador con sus estadísticas | pendiente |
+| RF-19 | Historial de partidas guardado en MongoDB | hecho |
+| RF-20 | Ranking con puntuación ELO | hecho |
+| RF-21 | Perfil del jugador con sus estadísticas | hecho |
 
 ### Hito 8: extras
 

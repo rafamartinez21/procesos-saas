@@ -65,6 +65,9 @@ export const ClienteApi = {
   },
   listarUsuarios: () => peticion("GET", "/api/usuarios"),
   criaturas: () => peticion("GET", "/api/criaturas"),
+  ranking: () => peticion("GET", "/api/juego/ranking"),
+  historial: () => peticion("GET", "/api/juego/historial"),
+  estadisticas: () => peticion("GET", "/api/juego/estadisticas"),
   usuarioActivo: async (email) => (await peticion("GET", `/api/usuarios/${encodeURIComponent(email)}/activo`)).activo,
   eliminarUsuario: (email) => peticion("DELETE", `/api/usuarios/${encodeURIComponent(email)}`),
 };

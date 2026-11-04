@@ -15,7 +15,7 @@ Resumen de carpetas en el [README](../README.md#arquitectura).
 |---|---|
 | Navegador | `cliente/` (HTML, CSS y módulos ES) |
 | Servidor (Google Cloud Run) | `index.js` y `servidor/` (Node.js y Express) |
-| Base de datos (MongoDB Atlas) | Colecciones `usuarios` y `sesiones` |
+| Base de datos (MongoDB Atlas) | Colecciones `usuarios`, `sesiones`, `partidas` y `jugadores` |
 
 El servidor sirve el frontend desde el mismo origen que la API: `express.static` en [servidor/api.js](../servidor/api.js).
 
@@ -23,7 +23,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 
 | Capa | Archivo | Responsabilidad |
 |---|---|---|
-| Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego. |
+| Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/progreso-vista.js](../cliente/progreso-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego y `progreso-vista.js`, el panel de estadísticas y ranking. |
 | Comunicación | [cliente/cliente-api.js](../cliente/cliente-api.js) | Único archivo que llama a `fetch`. Expone `ClienteApi` y convierte los errores HTTP en `ErrorApi`. |
 | Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`) y convierte los rechazos en `ErrorJuego`. |
 
@@ -41,8 +41,9 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 | Lógica del juego | [servidor/juego/salas.js](../servidor/juego/salas.js) | `Salas`: crear, listar, unirse a y abandonar partidas (hito 5); con dos jugadores crea el `Combate` de la partida y avisa con `alTerminar` cuando acaba. Sin Socket.IO ni HTTP (D-20); las partidas viven en memoria (D-21). Las vistas públicas no incluyen emails. |
 | Lógica del juego | [servidor/juego/criaturas.js](../servidor/juego/criaturas.js) | Catálogo de criaturas, movimientos, estados y tabla de eficacias (D-22). Datos fijos sin dependencias. |
 | Lógica del juego | [servidor/juego/combate.js](../servidor/juego/combate.js) | `Combate`: elección de equipos, turnos simultáneos (D-23), daño, eficacias, estados alterados y ganador. Valida cada acción y da a cada jugador una vista sin la acción ni el banquillo del rival (RNF-10). El azar se inyecta. |
+| Lógica del juego | [servidor/juego/progreso.js](../servidor/juego/progreso.js) | `Progreso`: guarda cada partida terminada, actualiza el ELO (D-24) y calcula historial, ranking y estadísticas. Recibe el CAD por parámetro, como `Sistema`. |
 | Lógica (utilidad) | [servidor/contrasenas.js](../servidor/contrasenas.js) | Hash y verificación de contraseñas con scrypt. |
-| Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`. |
+| Acceso a datos | [servidor/cad-memoria.js](../servidor/cad-memoria.js), [servidor/cad-mongo.js](../servidor/cad-mongo.js) | Misma interfaz: `insertarUsuario`, `buscarUsuario`, `listarUsuarios`, `actualizarUsuario`, `eliminarUsuario` y `buscarUsuarioPorToken`; y para el juego `insertarPartida`, `listarPartidasDe`, `buscarJugador`, `guardarJugador`, `listarRanking` y `eliminarJugador`. |
 | Transversal | [servidor/registro.js](../servidor/registro.js) | Log de actividad en JSON por la salida estándar. |
 | Servicio externo | [servidor/oauth-google.js](../servidor/oauth-google.js) | Cliente OAuth de Google: URL de autorización y cambio del código por el perfil. Se crea en `index.js` y se inyecta en la API; la lógica solo recibe el perfil. |
 | Servicio externo | [servidor/correo-brevo.js](../servidor/correo-brevo.js) | Envío de correo con la API de Brevo. Se crea en `index.js` y la lógica solo recibe `enviarConfirmacion`. |
@@ -73,6 +74,9 @@ Definidos en [servidor/api.js](../servidor/api.js). "Sesión" significa que sin 
 | GET | `/api/usuarios` | Sesión y rol administrador |
 | GET | `/api/usuarios/:email/activo` | Sesión y rol administrador |
 | DELETE | `/api/usuarios/:email` | Sesión: el administrador elimina a cualquiera; un usuario, solo su propia cuenta |
+| GET | `/api/juego/ranking` | Sesión (RF-20) |
+| GET | `/api/juego/historial` | Sesión: el historial del propio jugador (RF-19) |
+| GET | `/api/juego/estadisticas` | Sesión: las estadísticas del propio jugador (RF-21) |
 
 ## Eventos en tiempo real
 
