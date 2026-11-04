@@ -46,6 +46,7 @@ export const ClienteJuego = {
     socket.on("espectador:estado", (v) => avisos.alCambiarEspectador && avisos.alCambiarEspectador(v));
     socket.on("espectador:fin", () => avisos.alTerminarEspectador && avisos.alTerminarEspectador());
     socket.on("chat:historial", (lista) => avisos.alRecibirHistorialChat && avisos.alRecibirHistorialChat(lista));
+    socket.on("connect", () => avisos.alConectar && avisos.alConectar());
     socket.on("connect_error", (err) => avisos.alDesconectar && avisos.alDesconectar(err.message));
     socket.on("disconnect", (motivo) => avisos.alDesconectar && avisos.alDesconectar(motivo));
   },

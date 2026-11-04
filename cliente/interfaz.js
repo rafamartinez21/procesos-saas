@@ -337,7 +337,7 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       zona.replaceChildren(...hijos);
       return;
     }
-    if (!estado.conectado) hijos.push(el("p", { class: "suave" }, "Conectando con el servidor de partidas…"));
+    if (!estado.conectado) hijos.push(el("p", { class: estado.desconectado ? "aviso-error" : "suave" }, estado.desconectado ? "Reconectando con el servidor de partidas…" : "Conectando con el servidor de partidas…"));
     if (estado.partida) {
       hijos.push(panelPartida(estado.partida));
     } else {
@@ -371,7 +371,16 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       dibujar();
     },
     alCambiarPartida: (p) => {
+      // null: al reconectarse, el servidor dice que ya no estás en ninguna partida (RF-24).
+      if (!p && estado.partida && estado.combate && estado.combate.fase !== "terminada") {
+        mostrarMensaje("Has tardado demasiado en volver y has salido de la partida.", "error");
+      }
       estado.partida = p;
+      if (!p) {
+        estado.combate = null;
+        estado.seleccion = [];
+        if (!estado.mirando) estado.chat = [];
+      }
       dibujar();
     },
     alCambiarCombate: (v) => {
@@ -389,6 +398,10 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
       estado.mirando = v;
       dibujar();
     },
+    alConectar: () => {
+      if (estado.desconectado) mostrarMensaje("Conexión recuperada.", "ok");
+      estado.desconectado = false;
+    },
     alTerminarEspectador: () => {
       mostrarMensaje("La partida que mirabas ha terminado y los jugadores se han ido.", "info");
       estado.mirando = null;
@@ -405,7 +418,10 @@ function panelVestibulo({ alTerminarCombate = () => {} } = {}) {
     },
     alAbandonarRival: () => mostrarMensaje("Tu rival ha abandonado la partida.", "info"),
     alDesconectar: () => {
-      // Socket.IO se vuelve a conectar solo; al volver, el servidor reenvía partida y combate.
+      // Socket.IO se vuelve a conectar solo; al volver, el servidor reenvía partida, combate y
+      // chat (RF-24). Hay 30 segundos de margen antes de perder la partida.
+      if (estado.partida && !estado.desconectado) mostrarMensaje("Se ha perdido la conexión. Reconectando… tienes 30 segundos para volver.", "error");
+      estado.desconectado = true;
       estado.conectado = false;
       dibujar();
     },
