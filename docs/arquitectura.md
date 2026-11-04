@@ -25,7 +25,7 @@ El servidor sirve el frontend desde el mismo origen que la API: `express.static`
 |---|---|---|
 | Presentación (GUI) | [cliente/interfaz.js](../cliente/interfaz.js), [cliente/combate-vista.js](../cliente/combate-vista.js), [cliente/progreso-vista.js](../cliente/progreso-vista.js), [cliente/dom.js](../cliente/dom.js), [cliente/index.html](../cliente/index.html), [cliente/estilos.css](../cliente/estilos.css) | Dibuja pantallas y reacciona a clics. No hace peticiones. `combate-vista.js` dibuja la vista del combate que envía el servidor sin calcular nada del juego y `progreso-vista.js`, el panel de estadísticas y ranking. |
 | Comunicación | [cliente/cliente-api.js](../cliente/cliente-api.js) | Único archivo que llama a `fetch`. Expone `ClienteApi` y convierte los errores HTTP en `ErrorApi`. |
-| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `crearContraMaquina`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`) y convierte los rechazos en `ErrorJuego`. |
+| Comunicación (tiempo real) | [cliente/cliente-juego.js](../cliente/cliente-juego.js) | Único archivo que usa Socket.IO. Expone `ClienteJuego` (conectar con avisos, `crearPartida`, `crearContraMaquina`, `unirse`, `abandonar`, `elegirEquipo`, `atacar`, `cambiar`, `enviarMensaje`) y convierte los rechazos en `ErrorJuego`. |
 
 **Frontera:** `interfaz.js` importa `ClienteApi` y solo llama a sus funciones (`registrar`, `iniciarSesion`, `cerrarSesion`, `sesionActual`, `listarUsuarios`, `usuarioActivo`, `eliminarUsuario`). No conoce URLs, cabeceras ni cookies. Igual con `ClienteJuego`: la interfaz no conoce los nombres de los eventos.
 
@@ -91,7 +91,10 @@ Definidos en [servidor/tiempo-real.js](../servidor/tiempo-real.js). La conexión
 | Cliente → servidor | `partida:abandonar` | Sale de su partida (RF-14); durante el combate, lo pierde (RF-18) |
 | Cliente → servidor | `combate:equipo` `{ criaturas }` | Elige su equipo de tres (RF-16) |
 | Cliente → servidor | `combate:accion` `{ tipo, movimiento \| indice }` | Ataca o cambia de criatura (RF-17) |
+| Cliente → servidor | `chat:enviar` `{ texto }` | Escribe en el chat de su partida (RF-22) |
 | Servidor → todos | `partidas` | Lista de partidas abiertas, en cada cambio (RF-12) |
 | Servidor → jugadores | `partida:estado` | Estado de su partida cuando cambia |
 | Servidor → jugador | `partida:rival-abandona` | Su rival ha salido |
+| Servidor → jugadores | `chat:mensaje` | Mensaje nuevo del chat, con el nombre del autor |
+| Servidor → jugador | `chat:historial` | Últimos mensajes, al conectarse a una partida |
 | Servidor → jugador | `combate:estado` | Su propia vista del combate, en cada cambio (RNF-10: la del rival nunca sale del servidor) |

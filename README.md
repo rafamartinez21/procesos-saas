@@ -137,6 +137,7 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 - «Crear partida» genera un código corto (por ejemplo `K7Q2X`); la lista de partidas abiertas se actualiza en directo en todas las pantallas; se entra con «Unirse» o escribiendo el código.
 - Si un jugador abandona, el otro recibe un aviso y la partida vuelve a estar abierta. Si se pierde la conexión (recargar, corte de red), hay 30 segundos para volver antes de salir de la partida.
 - A los demás jugadores solo se les muestra el nombre, nunca el email.
+- Chat dentro de la partida (RF-22): mensajes de hasta 200 caracteres, como mucho 5 cada 10 segundos, mostrados siempre como texto. Al reconectarse se recuperan los últimos 50.
 
 ## Cómo se juega (hito 6)
 
