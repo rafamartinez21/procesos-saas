@@ -19,11 +19,11 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 
 | ID | Requisito | Estado |
 |---|---|---|
-| RF-11 | Crear una partida (queda abierta esperando rival) | parcial: lógica en `servidor/juego/salas.js`, falta el tiempo real |
-| RF-12 | Ver en directo la lista de partidas abiertas | parcial: lógica en `servidor/juego/salas.js`, falta el tiempo real |
-| RF-13 | Unirse a una partida abierta (máximo dos jugadores) | parcial: lógica en `servidor/juego/salas.js`, falta el tiempo real |
-| RF-14 | Abandonar una partida | parcial: lógica en `servidor/juego/salas.js`, falta el tiempo real |
-| RNF-09 | El canal en tiempo real exige una sesión válida (la misma cookie `sid`) | pendiente |
+| RF-11 | Crear una partida (queda abierta esperando rival) | hecho |
+| RF-12 | Ver en directo la lista de partidas abiertas | hecho |
+| RF-13 | Unirse a una partida abierta (máximo dos jugadores) | hecho |
+| RF-14 | Abandonar una partida | hecho |
+| RNF-09 | El canal en tiempo real exige una sesión válida (la misma cookie `sid`) | hecho |
 
 ### Hito 6: combate
 

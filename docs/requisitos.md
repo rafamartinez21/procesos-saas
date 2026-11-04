@@ -1,7 +1,7 @@
 ---
 type: Requisitos
-title: Estado de los requisitos del Sprint 1
-description: Cada requisito de la especificación con su estado y su evidencia en el repositorio.
+title: Estado de los requisitos
+description: Cada requisito de los Sprints 1 y 2 con su estado y su evidencia en el repositorio.
 timestamp: 2026-10-28
 ---
 
@@ -35,3 +35,15 @@ Estados: **hecho** (se cumple tal como lo pide la especificación, con evidencia
 | PRO-01 | Flujo de trabajo GitHub Flow | hecho | 15 pull requests integrados (`gh pr list --state all`); en `main` no hay más commits sin PR que el inicial. Ver [procesos.md](procesos.md#flujo-de-trabajo). |
 | PRO-02 | Integración continua | hecho | [.github/workflows/ci.yml](../.github/workflows/ci.yml) en cada pull request y en cada push a `main`. Las 30 ejecuciones registradas están en verde (`gh run list --limit 50`). |
 | PRO-03 | Despliegue continuo | hecho | Un activador de Google Cloud Build despliega en Cloud Run cada cambio de `main`; su comprobación aparece en los commits de `main`. Por verificar: la configuración del activador está en la consola de Google Cloud, no en el repositorio. |
+
+## Sprint 2: Ecos de Aetheria
+
+Los requisitos del juego se definen en [sprint-2.md](sprint-2.md). Aquí aparecen los que ya tienen evidencia.
+
+| ID | Requisito | Estado | Evidencia |
+|---|---|---|---|
+| RF-11 | Crear una partida | hecho | `Salas.crearPartida` en [servidor/juego/salas.js](../servidor/juego/salas.js) y evento `partida:crear` en [servidor/tiempo-real.js](../servidor/tiempo-real.js). Pruebas en [spec/salas.test.js](../spec/salas.test.js) y [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
+| RF-12 | Lista de partidas abiertas en directo | hecho | `Salas.listarAbiertas`; el servidor emite `partidas` a todos en cada cambio. Prueba "crear una partida responde con ella y avisa en directo a los demás jugadores". |
+| RF-13 | Unirse a una partida | hecho | `Salas.unirse` (máximo dos; `PARTIDA_LLENA`, `PARTIDA_NO_ENCONTRADA`, `YA_EN_PARTIDA`) y evento `partida:unirse`. |
+| RF-14 | Abandonar una partida | hecho | `Salas.abandonar` y evento `partida:abandonar`; el rival recibe `partida:rival-abandona`. Al perder la conexión hay 30 s para volver. Pruebas de desconexión y reconexión en [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
+| RNF-09 | Tiempo real solo con sesión válida | hecho | `io.use` en [servidor/tiempo-real.js](../servidor/tiempo-real.js) lee la cookie `sid`, y cada evento vuelve a comprobar la sesión. Pruebas "[error] sin cookie de sesión la conexión se rechaza" y "[error] tras cerrar sesión, el canal deja de aceptar acciones". |
