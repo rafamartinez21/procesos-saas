@@ -170,3 +170,4 @@ section.progreso { margin-bottom: 16px; }
 .res-victoria { color: var(--ok-texto); font-weight: 600; }
 .res-derrota { color: var(--error-texto); font-weight: 600; }
 tr.fila-mia td { background: var(--info-fondo); font-weight: 600; }
+.botones-vestibulo { display: flex; flex-wrap: wrap; gap: 8px; }

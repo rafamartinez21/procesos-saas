@@ -6,6 +6,13 @@
 const crypto = require("node:crypto");
 const { ErrorNegocio } = require("../modelo.js");
 const { Combate, FASE_TERMINADA } = require("./combate.js");
+const { elegirEquipoIA, elegirAccionIA } = require("./ia.js");
+
+// Identificador del rival máquina (RF-25). No tiene "@", así que nunca coincide con el email
+// de una cuenta (todos los emails válidos lo llevan).
+const PREFIJO_MAQUINA = "maquina:";
+const NOMBRE_MAQUINA = "Autómata de Aetheria";
+const esMaquina = (email) => typeof email === "string" && email.startsWith(PREFIJO_MAQUINA);
 
 const JUGADORES_POR_PARTIDA = 2;
 const ESTADO_ABIERTA = "abierta"; // esperando rival
@@ -121,9 +128,11 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   };
 
   // Si el combate acaba de terminar, la partida pasa a terminada y se avisa una sola vez.
+  // Las partidas contra la máquina no cuentan para el historial ni el ranking (D-25).
   const comprobarFinal = (partida) => {
     if (partida.estado === ESTADO_COMPLETA && partida.combate.fase === FASE_TERMINADA) {
       partida.estado = ESTADO_TERMINADA;
+      if (partida.contraMaquina) return;
       alTerminar({
         id: partida.id,
         jugadores: partida.participantes,
@@ -132,6 +141,36 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
         turnos: partida.combate.turno,
       });
     }
+  };
+
+  // La máquina actúa en cuanto le toca, con la misma vista que tendría un jugador (D-25).
+  const jugarMaquina = (partida) => {
+    if (!partida.contraMaquina) return;
+    const id = partida.participantes[1].email;
+    const c = partida.combate;
+    if (c.fase === "seleccion" && !c.vista(id).yo.equipo) c.elegirEquipo(id, elegirEquipoIA(aleatorio));
+    const accion = elegirAccionIA(c.vista(id), aleatorio);
+    if (accion) {
+      c.elegirAccion(id, accion);
+      comprobarFinal(partida);
+      // Tras un cambio obligado propio puede volver a tocarle (nuevo turno).
+      if (c.fase !== FASE_TERMINADA) jugarMaquina(partida);
+    }
+  };
+
+  // RF-25: partida contra la máquina. Empieza ya completa y no aparece en la lista.
+  this.crearPartidaContraMaquina = function (jugador) {
+    const j = validarJugador(jugador);
+    exigirLibre(j.email);
+    let id = generarId();
+    while (partidas.has(id)) id = generarId();
+    const maquina = { email: `${PREFIJO_MAQUINA}${id}`, nombre: NOMBRE_MAQUINA };
+    const partida = { id, estado: ESTADO_COMPLETA, jugadores: [j, maquina], creada: ahora(), contraMaquina: true };
+    partida.participantes = partida.jugadores.map((x) => ({ ...x }));
+    partida.combate = new Combate([j.email, maquina.email], { aleatorio });
+    partidas.set(id, partida);
+    jugarMaquina(partida);
+    return vistaPublica(partida);
   };
 
   const combateDe = (email) => {
@@ -145,6 +184,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   this.elegirEquipo = function (email, ids) {
     const partida = combateDe(email);
     partida.combate.elegirEquipo(email, ids);
+    jugarMaquina(partida);
     return partida.id;
   };
 
@@ -152,6 +192,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
     const partida = combateDe(email);
     partida.combate.elegirAccion(email, accion);
     comprobarFinal(partida);
+    if (partida.combate.fase !== FASE_TERMINADA) jugarMaquina(partida);
     return partida.id;
   };
 
@@ -179,7 +220,8 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
       partida.combate.abandonar(email);
       comprobarFinal(partida);
     }
-    partida.jugadores = partida.jugadores.filter((j) => j.email !== email);
+    // La máquina no se queda sola en una partida: si sale el humano, la partida desaparece.
+    partida.jugadores = partida.jugadores.filter((j) => j.email !== email && !esMaquina(j.email));
     if (partida.jugadores.length === 0) {
       partidas.delete(partida.id);
       return { id: partida.id, partida: null, restantes: [] };
@@ -193,4 +235,4 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   };
 }
 
-module.exports = { Salas, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };
+module.exports = { Salas, esMaquina, NOMBRE_MAQUINA, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };

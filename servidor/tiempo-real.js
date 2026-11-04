@@ -8,6 +8,7 @@
 //
 // Eventos que envía el cliente (todos con respuesta "ack" { ok, partida } o { ok:false, error, mensaje }):
 //   partida:crear            -> RF-11
+//   partida:crear-maquina    -> RF-25 (partida contra la máquina)
 //   partida:unirse { id }    -> RF-13
 //   partida:abandonar        -> RF-14 (durante el combate, lo pierde: RF-18)
 //   combate:equipo { criaturas: [ids] }               -> RF-16
@@ -142,6 +143,15 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       registro.info("partida creada", { usuario: email, partida: partida.id });
       io.to(salaDeUsuario(email)).emit("partida:estado", partida);
       difundirLista();
+      return partida;
+    });
+
+    manejar("partida:crear-maquina", async (_datos, jugador) => {
+      const partida = salas.crearPartidaContraMaquina(jugador);
+      await entrarEnSala(partida);
+      registro.info("partida contra la maquina creada", { usuario: email, partida: partida.id });
+      io.to(salaDeUsuario(email)).emit("partida:estado", partida);
+      avisarCombate([email]);
       return partida;
     });
 
