@@ -18,7 +18,8 @@
 //   partida:observar { id } / partida:dejar-observar  -> RF-23 (espectador)
 // Eventos que envía el servidor:
 //   partidas (lista)         -> RF-12, a todos cada vez que cambia
-//   partida:estado (partida) -> a los jugadores de una partida cuando cambia
+//   partida:estado (partida) -> a los jugadores de una partida cuando cambia; al conectarse,
+//                               null si ya no está en ninguna (RF-24: volvió tarde)
 //   partida:rival-abandona   -> al jugador que se queda solo
 //   combate:estado (vista)   -> a cada jugador, SU vista del combate (RNF-10: nunca la del rival)
 //   chat:mensaje (mensaje)   -> a la sala de la partida, cada mensaje nuevo
@@ -103,14 +104,19 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     // Al conectar: la lista de partidas y, si ya estaba en una (otra pestaña), su estado.
     socket.emit("partidas", salas.listarAbiertas());
     socket.emit("partidas:en-curso", salas.listarEnCurso());
+    // RF-24: al (re)conectarse se envía el estado completo, también cuando ya no hay nada
+    // (null), para que el cliente no siga mostrando una partida que ya no existe.
     const mirando = salas.observandoDe(email);
     if (mirando) {
       socket.join(salaDeEspectadores(mirando));
       socket.emit("espectador:estado", salas.vistaEspectador(mirando));
       const chat = salas.chatDe(email);
       if (chat.length) socket.emit("chat:historial", chat);
+    } else {
+      socket.emit("espectador:estado", null);
     }
     const actual = salas.partidaDe(email);
+    if (!actual) socket.emit("partida:estado", null);
     if (actual) {
       socket.join(salaDePartida(actual.id));
       socket.emit("partida:estado", actual);

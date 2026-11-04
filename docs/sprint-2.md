@@ -49,7 +49,7 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 |---|---|---|
 | RF-22 | Chat dentro de la partida | hecho |
 | RF-23 | Modo espectador | hecho |
-| RF-24 | Reconexión a una partida en curso | pendiente |
+| RF-24 | Reconexión a una partida en curso | hecho |
 | RF-25 | Rival controlado por la máquina | hecho |
 
 ## Cómo se trabaja cada requisito

@@ -388,3 +388,22 @@ test("espectador: cuando los dos jugadores salen, recibe el aviso de fin", async
   await fin;
   assert.equal(salas.observandoDe("eva@test.es"), null);
 });
+
+// ---------- RF-24 reconexión ----------
+
+test("RF-24: si vuelve pasado el margen, sale de la partida (gana el rival) y al conectarse recibe que no está en ninguna", async () => {
+  const { ana, luis } = await enCombate();
+  const victoria = esperarQue(luis, "combate:estado", (v) => v.fase === "terminada");
+  ana.disconnect();
+  const v = await victoria; // pasan los 50 ms de margen de las pruebas
+  assert.deepEqual([v.ganador, v.motivo], ["yo", "abandono"]);
+  const vuelve = await clienteDe("ana@test.es");
+  assert.equal(await esperar(vuelve, "partida:estado"), null);
+});
+
+test("RF-24: al conectarse sin partida ni nada que mirar, el cliente recibe los dos estados vacíos", async () => {
+  const eva = await clienteDe("eva@test.es");
+  const [partida, espectador] = await Promise.all([esperar(eva, "partida:estado"), esperar(eva, "espectador:estado")]);
+  assert.equal(partida, null);
+  assert.equal(espectador, null);
+});

@@ -135,7 +135,7 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 
 - Con la sesión iniciada, la página se conecta por Socket.IO usando la misma cookie de sesión; sin sesión válida el servidor rechaza la conexión, y comprueba la sesión de nuevo en cada acción.
 - «Crear partida» genera un código corto (por ejemplo `K7Q2X`); la lista de partidas abiertas se actualiza en directo en todas las pantallas; se entra con «Unirse» o escribiendo el código.
-- Si un jugador abandona, el otro recibe un aviso y la partida vuelve a estar abierta. Si se pierde la conexión (recargar, corte de red), hay 30 segundos para volver antes de salir de la partida.
+- Si un jugador abandona, el otro recibe un aviso y la partida vuelve a estar abierta. Si se pierde la conexión (recargar, corte de red), hay 30 segundos para volver antes de salir de la partida (RF-24). La página se reconecta sola, avisa mientras tanto y, al volver, recupera la partida, el combate y el chat. Si se vuelve tarde, se ha perdido la partida y la página lo indica.
 - A los demás jugadores solo se les muestra el nombre, nunca el email.
 - Modo espectador (RF-23): «Combates en curso» lista las partidas que se están jugando y «Mirar» las sigue turno a turno. Se ven las dos criaturas en combate y el chat, pero no el banquillo ni la acción elegida de nadie (D-26).
 - Chat dentro de la partida (RF-22): mensajes de hasta 200 caracteres, como mucho 5 cada 10 segundos, mostrados siempre como texto. Al reconectarse se recuperan los últimos 50.
