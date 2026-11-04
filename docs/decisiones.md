@@ -115,3 +115,21 @@ timestamp: 2026-10-28
 - **Por qué:** evita que la cuenta local quede vinculada a un acceso que su dueño no ha autorizado y mantiene un solo método de acceso por cuenta.
 - **Estado:** vigente.
 
+
+## D-19 Socket.IO para la comunicación en tiempo real
+
+- **Qué se decidió:** las partidas usan Socket.IO sobre el mismo servidor HTTP de Express (mismo origen). La API REST sigue para usuarios y sesiones.
+- **Por qué:** es la librería que usa el material del curso (Sprint 3, "gestionar partidas con WebSockets"), funciona en Cloud Run, que admite WebSockets, y aporta salas (`rooms`) y reconexión automática sin código propio.
+- **Estado:** vigente.
+
+## D-20 El servidor es la única autoridad del juego
+
+- **Qué se decidió:** las reglas del juego (turnos, daño, eficacias, ganador) están en la capa de lógica (`servidor/juego/`), sin dependencias de Socket.IO ni de HTTP. La capa de tiempo real solo traduce eventos a llamadas a la lógica y difunde el estado resultante. El cliente envía intenciones, nunca resultados.
+- **Por qué:** impide hacer trampas desde el navegador y permite probar el juego entero con pruebas unitarias, igual que la lógica de usuarios. El azar se inyecta (función `aleatorio`) para que las pruebas sean deterministas.
+- **Estado:** vigente.
+
+## D-21 Partidas en curso en memoria; resultados en MongoDB
+
+- **Qué se decidió:** las partidas abiertas y en curso se guardan en memoria del servidor. Solo el resultado de cada partida terminada se guarda en MongoDB (hito 7).
+- **Por qué:** una partida dura minutos y cambia en cada turno; guardarla en la base de datos en cada acción añade latencia sin beneficio. Consecuencia: el servicio de Cloud Run debe ejecutarse con una sola instancia para que los dos jugadores lleguen al mismo proceso. Por verificar: número máximo de instancias igual a 1 en la configuración de Cloud Run.
+- **Estado:** vigente.
