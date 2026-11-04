@@ -4,6 +4,14 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-04 | Etiqueta `hito-8` | [hito-8](https://github.com/rafamartinez21/procesos-saas/tree/hito-8) |
+| 2026-11-04 | RF-24: reconexión a una partida en curso | [PR #30](https://github.com/rafamartinez21/procesos-saas/pull/30) |
+| 2026-11-04 | RF-23: modo espectador (D-26) | [PR #29](https://github.com/rafamartinez21/procesos-saas/pull/29) |
+| 2026-11-04 | RF-22: chat dentro de la partida | [PR #28](https://github.com/rafamartinez21/procesos-saas/pull/28) |
+| 2026-11-04 | RF-25: rival controlado por la máquina (D-25) | [PR #27](https://github.com/rafamartinez21/procesos-saas/pull/27) |
+| 2026-11-04 | Etiqueta `hito-7` | [hito-7](https://github.com/rafamartinez21/procesos-saas/tree/hito-7) |
+| 2026-11-04 | Hito 7: historial, ranking ELO y estadísticas (D-24). Se integró antes de que arrancara la CI; la ejecución posterior del PR y la de `main` pasaron en verde | [PR #26](https://github.com/rafamartinez21/procesos-saas/pull/26) |
+| 2026-11-04 | Log OKF de los hitos 5 y 6 | [PR #25](https://github.com/rafamartinez21/procesos-saas/pull/25) |
 | 2026-11-04 | Etiqueta `hito-6` | [hito-6](https://github.com/rafamartinez21/procesos-saas/tree/hito-6) |
 | 2026-11-04 | Etiqueta `hito-5` sobre el merge del PR #21 | [hito-5](https://github.com/rafamartinez21/procesos-saas/tree/hito-5) |
 | 2026-11-04 | Hito 6: combate en tiempo real y pantalla de combate | [PR #24](https://github.com/rafamartinez21/procesos-saas/pull/24) |

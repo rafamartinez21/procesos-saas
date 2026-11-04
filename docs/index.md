@@ -12,4 +12,4 @@ Tablero de Donetonic (requiere iniciar sesión): https://app.donetonic.com/works
 | [decisiones.md](decisiones.md) | Decisiones de diseño (D-01, D-02…) con su motivo y su estado. |
 | [procesos.md](procesos.md) | Flujo de trabajo, integración continua y despliegue continuo. |
 | [sprint-1.md](sprint-1.md) | Lo hecho en cada hito y retrospectiva del Sprint 1. |
-| [sprint-2.md](sprint-2.md) | Objetivo del Sprint 2 (juego Ecos de Aetheria), hitos 5 a 8 y sus requisitos. |
+| [sprint-2.md](sprint-2.md) | Objetivo del Sprint 2 (juego Ecos de Aetheria), hitos 5 a 8 con sus requisitos, lo hecho en cada uno y retrospectiva. |
