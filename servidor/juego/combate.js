@@ -18,6 +18,8 @@ const TAMANO_EQUIPO = 3;
 const BONO_MISMO_ELEMENTO = 1.25; // un movimiento del elemento de la criatura pega más
 const PROB_DESCONGELAR = 0.3;
 const PROB_PARALISIS = 0.25;
+const PROB_CRITICO = 1 / 16; // RF-30
+const MULTIPLICADOR_CRITICO = 1.5;
 const FASE_SELECCION = "seleccion";
 const FASE_COMBATE = "combate";
 const FASE_TERMINADA = "terminada";
@@ -25,10 +27,10 @@ const MAX_CRONICA = 200;
 
 // Fórmula de daño. Se exporta para probarla aparte.
 //   base = potencia * ataque / defensa / 3 + 2
-//   daño = base * bono por mismo elemento * eficacia * variación (85 %..100 %), mínimo 1
-function calcularDanio({ potencia, ataque, defensa, mismoElemento, eficacia: ef, variacion }) {
+//   daño = base * bono por mismo elemento * eficacia * variación (85 %..100 %) * crítico (x1,5), mínimo 1
+function calcularDanio({ potencia, ataque, defensa, mismoElemento, eficacia: ef, variacion, critico = false }) {
   const base = (potencia * ataque) / defensa / 3 + 2;
-  return Math.max(1, Math.floor(base * (mismoElemento ? BONO_MISMO_ELEMENTO : 1) * ef * variacion));
+  return Math.max(1, Math.floor(base * (mismoElemento ? BONO_MISMO_ELEMENTO : 1) * ef * variacion * (critico ? MULTIPLICADOR_CRITICO : 1)));
 }
 
 function nuevaInstancia(datos) {
@@ -219,6 +221,9 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       }
 
       const ef = eficacia(mov.elemento, d.elemento);
+      const variacion = 0.85 + aleatorio() * 0.15;
+      // RF-30: un golpe crítico hace un 50 % más de daño.
+      const critico = aleatorio() < PROB_CRITICO;
       const danio = Math.min(
         d.ps,
         calcularDanio({
@@ -227,12 +232,13 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
           defensa: d.defensa,
           mismoElemento: mov.elemento === a.elemento,
           eficacia: ef,
-          variacion: 0.85 + aleatorio() * 0.15,
+          variacion,
+          critico,
         })
       );
       d.ps -= danio;
       // elemento y psObjetivo: para animar el golpe y la barra de PS paso a paso (RF-28).
-      eventos.push({ tipo: "ataque", quien: e, criatura: a.nombre, movimiento: mov.nombre, elemento: mov.elemento, objetivo: d.nombre, danio, eficacia: ef, psObjetivo: d.ps });
+      eventos.push({ tipo: "ataque", quien: e, criatura: a.nombre, movimiento: mov.nombre, elemento: mov.elemento, objetivo: d.nombre, danio, eficacia: ef, critico, psObjetivo: d.ps });
 
       if (mov.efecto && mov.efecto.drenar && a.ps < a.psMax) {
         const cura = Math.min(a.psMax - a.ps, Math.floor(danio * mov.efecto.drenar));
@@ -366,4 +372,4 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
   };
 }
 
-module.exports = { Combate, calcularDanio, TAMANO_EQUIPO, FASE_SELECCION, FASE_COMBATE, FASE_TERMINADA };
+module.exports = { Combate, calcularDanio, PROB_CRITICO, TAMANO_EQUIPO, FASE_SELECCION, FASE_COMBATE, FASE_TERMINADA };
