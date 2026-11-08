@@ -170,3 +170,9 @@ timestamp: 2026-10-28
 - **Por qué:** los dibujos son originales y no dependen de imágenes de terceros. Pesan unos pocos kilobytes, se ven nítidos a cualquier tamaño y se pueden animar con CSS. Como el catálogo también está en el código (D-22), una prueba comprueba que ninguna criatura se queda sin retrato.
 - **Estado:** vigente.
 
+## D-28 El juego tiene su propio tema oscuro y no sigue el modo claro del sistema
+
+- **Qué se decidió:** toda la interfaz usa una identidad visual propia de Aetheria (noche estrellada, oro y éter) definida con variables CSS en [cliente/estilos.css](../cliente/estilos.css). Ya no cambia con el modo claro u oscuro del sistema. Las fuentes Cinzel e Inter se cargan de Google Fonts; si no cargan, se usan las del sistema. Las animaciones decorativas se desactivan si el sistema pide reducir el movimiento.
+- **Por qué:** un juego necesita una ambientación coherente, y mantener dos temas dobla el trabajo de diseño de cada pantalla. El contraste del texto sobre el fondo oscuro se mantiene alto. Las fuentes son la única dependencia externa del cliente y no afectan al funcionamiento.
+- **Estado:** vigente.
+

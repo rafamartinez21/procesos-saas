@@ -1,94 +1,89 @@
-// PRESENTACIÓN DEL PROGRESO (frontend, hito 7)
-// Panel con las estadísticas del jugador, sus últimas partidas y el ranking ELO.
+// PRESENTACIÓN DEL PROGRESO (frontend, hito 7; aspecto de RF-26)
+// Panel con el ELO del jugador, sus estadísticas, el ranking y sus últimas partidas.
 // Pide los datos con ClienteApi y los dibuja; todos los textos van con textContent (dom.js).
 
 import { ClienteApi } from "./cliente-api.js";
 import { el } from "./dom.js";
+import { emblema } from "./retratos.js";
 
 const RESULTADO = { victoria: "Victoria", derrota: "Derrota", empate: "Empate" };
 
-const fecha = (ms) => new Date(ms).toLocaleString("es-ES", { dateStyle: "short", timeStyle: "short" });
+const fecha = (ms) => new Date(ms).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 const conSigno = (n) => (n > 0 ? `+${n}` : String(n));
+
+// Rango decorativo según el ELO (solo es un nombre: la puntuación la calcula el servidor).
+const RANGOS = [
+  [1300, "Leyenda de Aetheria"],
+  [1150, "Maestro del éter"],
+  [1050, "Adepto"],
+  [950, "Iniciado"],
+  [0, "Aprendiz"],
+];
+export const rangoDe = (elo) => RANGOS.find(([minimo]) => elo >= minimo)[1];
 
 function dato(valor, etiqueta) {
   return el("div", { class: "dato" }, el("span", { class: "dato-valor" }, String(valor)), el("span", { class: "dato-etiqueta" }, etiqueta));
 }
 
-function tablaHistorial(partidas) {
-  if (!partidas.length) return el("p", { class: "suave" }, "Aún no has jugado ninguna partida.");
+function listaHistorial(partidas) {
+  if (!partidas.length) return el("p", { class: "vacio" }, "Aún no has jugado contra nadie. ¡Tu primera victoria te espera!");
   return el(
-    "div",
-    { class: "tabla-contenedor" },
-    el(
-      "table",
-      {},
-      el("thead", {}, el("tr", {}, ...["Fecha", "Rival", "Resultado", "Turnos", "ELO"].map((t) => el("th", {}, t)))),
+    "ul",
+    { class: "lista-historial" },
+    ...partidas.map((p) =>
       el(
-        "tbody",
-        {},
-        ...partidas.map((p) =>
-          el(
-            "tr",
-            {},
-            el("td", {}, fecha(p.fecha)),
-            el("td", {}, p.rival),
-            el("td", { class: `res-${p.resultado}` }, RESULTADO[p.resultado] + (p.motivo === "abandono" ? " (abandono)" : "")),
-            el("td", {}, String(p.turnos)),
-            el("td", {}, `${p.elo} (${conSigno(p.cambioElo)})`)
-          )
-        )
+        "li",
+        { class: `res-${p.resultado}` },
+        el("span", { class: "marca-res", "aria-hidden": "true" }),
+        el("span", {}, `${RESULTADO[p.resultado]} contra ${p.rival}`, el("small", {}, `${fecha(p.fecha)} · ${p.turnos} turnos${p.motivo === "abandono" ? " · abandono" : ""}`)),
+        el("span", { class: `cambio-elo ${p.cambioElo > 0 ? "sube" : p.cambioElo < 0 ? "baja" : ""}`, title: `ELO tras la partida: ${p.elo}` }, conSigno(p.cambioElo))
       )
     )
   );
 }
 
-function tablaRanking(ranking, miNombre) {
-  if (!ranking.length) return el("p", { class: "suave" }, "Todavía no hay nadie en el ranking. ¡Juega la primera partida!");
+function listaRanking(ranking, miNombre) {
+  if (!ranking.length) return el("p", { class: "vacio" }, "Todavía no hay nadie en el ranking. ¡Sé el primero!");
+  const medalla = ["oro", "plata", "bronce"];
   return el(
-    "div",
-    { class: "tabla-contenedor" },
-    el(
-      "table",
-      {},
-      el("thead", {}, el("tr", {}, ...["#", "Jugador", "ELO", "G", "P", "E"].map((t) => el("th", {}, t)))),
+    "ol",
+    { class: "lista-ranking" },
+    ...ranking.slice(0, 10).map((j) =>
       el(
-        "tbody",
-        {},
-        ...ranking.map((j) =>
-          el(
-            "tr",
-            { class: j.nombre === miNombre ? "fila-mia" : "" },
-            el("td", {}, String(j.posicion)),
-            el("td", {}, j.nombre),
-            el("td", {}, String(j.elo)),
-            el("td", {}, String(j.ganadas)),
-            el("td", {}, String(j.perdidas)),
-            el("td", {}, String(j.empates))
-          )
-        )
+        "li",
+        { class: j.nombre === miNombre ? "mia" : "" },
+        el("span", { class: `pos ${medalla[j.posicion - 1] || ""}` }, j.posicion <= 3 ? ["①", "②", "③"][j.posicion - 1] : String(j.posicion)),
+        el("span", { class: "quien" }, j.nombre, el("small", {}, `${j.ganadas} G · ${j.perdidas} P · ${j.empates} E`)),
+        el("span", { class: "elo" }, String(j.elo))
       )
     )
   );
 }
 
-// Devuelve { nodo, recargar }: el vestíbulo llama a recargar al terminar un combate.
-export function panelProgreso({ alError }) {
-  const nodo = el("section", { class: "progreso" }, el("p", { class: "suave" }, "Cargando tu progreso…"));
+// Devuelve { nodo, recargar }. alCargar(yo) recibe las estadísticas (la barra superior
+// muestra el ELO). El vestíbulo llama a recargar al terminar un combate.
+export function panelProgreso({ alError, alCargar = () => {} }) {
+  const nodo = el("aside", { class: "columna-lateral", "aria-label": "Tu progreso" }, el("div", { class: "panel" }, el("p", { class: "suave" }, "Cargando tu progreso…")));
 
   async function recargar() {
     try {
       const [yo, historial, ranking] = await Promise.all([ClienteApi.estadisticas(), ClienteApi.historial(), ClienteApi.ranking()]);
+      alCargar(yo);
       nodo.replaceChildren(
-        el("h2", {}, "Tu progreso"),
         el(
-          "div",
-          { class: "datos" },
-          dato(yo.elo, "ELO"),
-          dato(yo.jugadas, "Partidas"),
-          dato(`${yo.porcentajeVictorias}%`, "Victorias"),
-          dato(yo.rachaVictorias, "Racha")
+          "section",
+          { class: "panel" },
+          el("span", { class: "etiqueta-seccion" }, "Tu progreso"),
+          el(
+            "div",
+            { class: "elo-tarjeta", style: "margin-top:10px" },
+            emblema(),
+            el("div", {}, el("div", { class: "elo-valor" }, String(yo.elo)), el("div", { class: "elo-rango" }, `ELO · ${rangoDe(yo.elo)}`))
+          ),
+          el("div", { class: "datos" }, dato(yo.jugadas, "Partidas"), dato(`${yo.porcentajeVictorias}%`, "Victorias"), dato(yo.rachaVictorias, "Racha"))
         ),
-        el("div", { class: "columnas" }, el("div", {}, el("h3", {}, "Últimas partidas"), tablaHistorial(historial.slice(0, 10))), el("div", {}, el("h3", {}, "Ranking"), tablaRanking(ranking, yo.nombre)))
+        el("section", { class: "panel" }, el("h2", {}, "Ranking"), listaRanking(ranking, yo.nombre)),
+        el("section", { class: "panel" }, el("h2", {}, "Últimos duelos"), listaHistorial(historial.slice(0, 6)))
       );
     } catch (err) {
       alError(err);
