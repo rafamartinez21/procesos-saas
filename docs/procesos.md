@@ -14,10 +14,10 @@ Se sigue GitHub Flow ([README](../README.md#flujo-de-trabajo)):
 1. Una rama por cambio desde `main`, con un prefijo según el tipo: `feat/`, `ci/` o `docs/`.
 2. Pruebas en local con `npm test` antes de abrir el pull request.
 3. Pull request contra `main`, que se integra con un commit de merge cuando la CI está en verde.
-4. Al terminar cada hito se pone una etiqueta en `main`: `hito-1`, `hito-2`, `hito-3` y de `hito-5` a `hito-8`.
+4. Al terminar cada hito se pone una etiqueta en `main`: de `hito-1` a `hito-8`. La de `hito-4` se puso al cerrar RF-04 en el Sprint 2 (ver [sprint-1.md](sprint-1.md)).
 
 **Evidencia:**
-- 30 pull requests, todos integrados (`gh pr list --state all`). El PR #26 se integró antes de que arrancara su CI, que después pasó en verde ([log](log.md)).
+- 33 pull requests, todos integrados (`gh pr list --state all`). El PR #26 se integró antes de que arrancara su CI, que después pasó en verde ([log](log.md)).
 - En `git log --first-parent main`, todos los commits son merges de pull requests, salvo el commit inicial `583a961`.
 
 Por verificar: si la protección de la rama `main` está activada (Settings → Branches en GitHub).

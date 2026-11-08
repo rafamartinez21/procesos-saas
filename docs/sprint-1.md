@@ -54,7 +54,7 @@ Objetivos de cada hito según el apartado 10 de la especificación. Las tareas e
   - CI con `npm ci` ([PR #14](https://github.com/rafamartinez21/procesos-saas/pull/14));
   - en la prueba individual, normalización y validación de email ([PR #15](https://github.com/rafamartinez21/procesos-saas/pull/15)).
 - **Pendiente:** OAuth (RF-04) y envío real del correo (RF-02). Ver [sprint-2.md](sprint-2.md).
-- **PR y etiqueta:** sin etiqueta de hito 4, porque el hito no está terminado.
+- **PR y etiqueta:** sin etiqueta de hito 4 en este sprint, porque el hito no estaba terminado. Se cerró en el Sprint 2: RF-02 con Brevo (D-16) y RF-04 con Google (D-17), comprobado en producción el 2026-11-09; etiqueta `hito-4`.
 
 ## Retrospectiva
 

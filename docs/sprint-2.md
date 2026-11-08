@@ -91,8 +91,8 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 - **Qué mejorar:**
   - el PR #26 se integró sin esperar a la CI;
   - las partidas en curso viven en memoria (D-21), así que el servicio necesita una sola instancia y un reinicio termina las partidas.
+- **Comprobado en la consola de Cloud Run:** número máximo de instancias igual a 1 (D-21).
 - **Por verificar:**
-  - en Cloud Run, número máximo de instancias igual a 1 (D-21);
   - en Cloud Run, tiempo máximo de petición: los WebSockets se cortan al llegar a él, aunque se recuperan con la reconexión (RF-24).
 
 ## Requisitos que pasan del Sprint 1
@@ -100,4 +100,4 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 | ID | Requisito | Estado | Qué falta |
 |---|---|---|---|
 | RF-02 | Confirmación de cuenta por correo | hecho | Correo con Brevo (D-16) y reenvío del enlace. Ver [requisitos.md](requisitos.md). |
-| RF-04 | Inicio de sesión con OAuth | hecho | Google (D-17); un email con cuenta local se rechaza (D-18). Por verificar: credenciales de Google en Cloud Run (etiqueta `hito-4` pendiente de esa comprobación). |
+| RF-04 | Inicio de sesión con OAuth | hecho | Google (D-17); un email con cuenta local se rechaza (D-18). Credenciales de Google en Cloud Run comprobadas el 2026-11-09; con eso se cierra el hito 4 (etiqueta `hito-4`). |
