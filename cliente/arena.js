@@ -246,7 +246,7 @@ export function crearArena() {
         default:
           break;
       }
-      await esperar(ev.tipo === "fin" ? 200 : 650);
+      await esperar(ev.tipo === "fin" ? 200 : 450);
     }
   }
 

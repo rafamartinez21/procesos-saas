@@ -21,6 +21,7 @@ const PROB_PARALISIS = 0.25;
 const FASE_SELECCION = "seleccion";
 const FASE_COMBATE = "combate";
 const FASE_TERMINADA = "terminada";
+const MAX_CRONICA = 200;
 
 // Fórmula de daño. Se exporta para probarla aparte.
 //   base = potencia * ataque / defensa / 3 + 2
@@ -54,6 +55,13 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
   this.ganador = null;
   this.motivo = null;
   this.eventos = []; // lo ocurrido en el último turno resuelto
+  // RF-29: crónica de todo el combate, turno a turno: [{ turno, eventos }]. Se guardan como
+  // mucho las últimas MAX_CRONICA entradas.
+  this.cronica = [];
+  const anotar = (turno, eventos) => {
+    this.cronica.push({ turno, eventos });
+    if (this.cronica.length > MAX_CRONICA) this.cronica.splice(0, this.cronica.length - MAX_CRONICA);
+  };
   const jugadores = new Map(emails.map((e) => [e, { equipo: null, activa: 0, accion: null, debeCambiar: false }]));
   const rivalDe = (email) => emails.find((e) => e !== email);
 
@@ -111,6 +119,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       j.activa = accion.indice;
       j.debeCambiar = false;
       this.eventos = [eventoCambio(email, activa(j))];
+      anotar(this.turno, this.eventos);
       return true;
     }
 
@@ -257,6 +266,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     }
 
     for (const j of jugadores.values()) j.accion = null;
+    anotar(this.turno, eventos);
     if (this.fase !== FASE_TERMINADA) this.turno += 1;
     this.eventos = eventos;
   };
@@ -269,6 +279,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     this.ganador = rivalDe(email);
     this.motivo = "abandono";
     this.eventos = [{ tipo: "fin", ganador: this.ganador, motivo: this.motivo }];
+    anotar(this.turno, this.eventos);
   };
 
   // ---------- Vista de un espectador (RF-23) ----------
@@ -287,20 +298,22 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         eleccionHecha: this.fase === FASE_SELECCION ? Boolean(j.equipo) : Boolean(j.accion),
       };
     };
+    const traducir = (ev) => {
+      const copia = { ...ev };
+      // lado: 0 o 1, el jugador al que se refiere (dos jugadores pueden llamarse igual).
+      if ("quien" in copia) {
+        copia.lado = emails.indexOf(copia.quien);
+        copia.quien = nombre(copia.quien);
+      }
+      if ("ganador" in copia) copia.ganador = nombre(copia.ganador);
+      return copia;
+    };
     return {
       fase: this.fase,
       turno: this.turno,
       jugadores: emails.map(lado),
-      eventos: this.eventos.map((ev) => {
-        const copia = { ...ev };
-        // lado: 0 o 1, el jugador al que se refiere (dos jugadores pueden llamarse igual).
-        if ("quien" in copia) {
-          copia.lado = emails.indexOf(copia.quien);
-          copia.quien = nombre(copia.quien);
-        }
-        if ("ganador" in copia) copia.ganador = nombre(copia.ganador);
-        return copia;
-      }),
+      eventos: this.eventos.map(traducir),
+      cronica: this.cronica.map((t) => ({ turno: t.turno, eventos: t.eventos.map(traducir) })),
       ganador: this.fase === FASE_TERMINADA ? nombre(this.ganador) : null,
       motivo: this.motivo,
     };
@@ -314,6 +327,12 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     const j = exigirJugador(email);
     const r = jugadores.get(rivalDe(email));
     const quien = (e) => (e === email ? "yo" : e ? "rival" : null);
+    const traducir = (ev) => {
+      const copia = { ...ev };
+      if ("quien" in copia) copia.quien = quien(copia.quien);
+      if ("ganador" in copia) copia.ganador = quien(copia.ganador);
+      return copia;
+    };
     const criatura = (c) => ({ id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado });
     return {
       fase: this.fase,
@@ -339,12 +358,8 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         eleccionHecha: this.fase === FASE_SELECCION ? Boolean(r.equipo) : Boolean(r.accion),
         debeCambiar: r.debeCambiar,
       },
-      eventos: this.eventos.map((ev) => {
-        const copia = { ...ev };
-        if ("quien" in copia) copia.quien = quien(copia.quien);
-        if ("ganador" in copia) copia.ganador = quien(copia.ganador);
-        return copia;
-      }),
+      eventos: this.eventos.map(traducir),
+      cronica: this.cronica.map((t) => ({ turno: t.turno, eventos: t.eventos.map(traducir) })),
       ganador: this.fase === FASE_TERMINADA ? quien(this.ganador) : null,
       motivo: this.motivo,
     };

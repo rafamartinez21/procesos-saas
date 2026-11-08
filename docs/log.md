@@ -4,6 +4,12 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-09 | Etiqueta `hito-9` | [hito-9](https://github.com/rafamartinez21/procesos-saas/tree/hito-9) |
+| 2026-11-09 | RF-29: crónica completa del combate | [PR #38](https://github.com/rafamartinez21/procesos-saas/pull/38) |
+| 2026-11-09 | RF-28: arena de combate con el turno animado (D-29) | [PR #37](https://github.com/rafamartinez21/procesos-saas/pull/37) |
+| 2026-11-09 | RF-26: identidad visual propia de Aetheria (D-28) | [PR #36](https://github.com/rafamartinez21/procesos-saas/pull/36) |
+| 2026-11-09 | RF-27: retratos originales de las doce criaturas (D-27) | [PR #35](https://github.com/rafamartinez21/procesos-saas/pull/35) |
+| 2026-11-09 | Plan del Sprint 3: nueva interfaz y más estrategia (hitos 9 a 11) | [PR #34](https://github.com/rafamartinez21/procesos-saas/pull/34) |
 | 2026-11-09 | Etiqueta `hito-4`: RF-02 y RF-04 cerrados y comprobados en producción | [hito-4](https://github.com/rafamartinez21/procesos-saas/tree/hito-4) |
 | 2026-11-09 | Cierre del hito 4: credenciales de Google en Cloud Run; `/api/auth/google` redirige a Google | [PR #33](https://github.com/rafamartinez21/procesos-saas/pull/33) |
 | 2026-11-08 | Corrección del OKF: la prueba de la máquina recorre 349 turnos (825 acciones), no «miles de turnos» | [PR #32](https://github.com/rafamartinez21/procesos-saas/pull/32) |

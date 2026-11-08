@@ -33,7 +33,7 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 | RF-26 | Identidad visual propia de Aetheria en todo el juego: portada, vestíbulo, elección de equipo y resultado, adaptada a móvil | 8 h | hecho |
 | RF-27 | Retratos originales de las doce criaturas | 6 h | hecho |
 | RF-28 | Arena de combate con el turno animado paso a paso (ataque, impacto, daño y PS); sin animaciones si el sistema pide reducir el movimiento | 8 h | hecho |
-| RF-29 | Crónica completa del combate, turno a turno, también tras reconectarse | 2 h | pendiente |
+| RF-29 | Crónica completa del combate, turno a turno, también tras reconectarse | 2 h | hecho |
 
 ### Hito 10: más estrategia
 
@@ -63,7 +63,15 @@ Igual que en el Sprint 2:
 
 ## Qué se hizo en cada hito
 
-Se completa al cerrar cada hito.
+### Hito 9: nueva interfaz del juego
+
+- **Qué se hizo:**
+  - retratos SVG originales de las doce criaturas, iconos de elemento y emblema (D-27);
+  - identidad visual propia en todo el juego: portada, vestíbulo con modos de juego, sala de espera, elección de equipo con cartas y bandeja, progreso con rango y ranking con medallas, adaptado a móvil (D-28);
+  - arena de combate con cada turno animado paso a paso; el servidor manda en los eventos los datos para animarlos y la eficacia de cada movimiento (D-29);
+  - crónica completa del combate.
+- **PR y etiqueta:** [PR #34](https://github.com/rafamartinez21/procesos-saas/pull/34) (plan), [PR #35](https://github.com/rafamartinez21/procesos-saas/pull/35) a [PR #38](https://github.com/rafamartinez21/procesos-saas/pull/38). Etiqueta `hito-9`.
+- **Cómo se comprobó:** además de las pruebas automáticas, cada pantalla se revisó en el navegador con dos cuentas locales, en escritorio y a 375 px de ancho, jugando contra el Autómata y recargando en mitad del combate.
 
 ## Retrospectiva
 

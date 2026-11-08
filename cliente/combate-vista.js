@@ -244,6 +244,25 @@ function controlesJugador(vista, acciones) {
   );
 }
 
+// RF-29: crónica de todo el combate. El <details> se crea una vez, así se queda abierto o
+// cerrado entre redibujados; solo cambia la lista. Se actualiza al acabar de reproducir
+// cada turno, para no adelantar lo que aún se está animando.
+function crearCronica(texto) {
+  const lista = el("ol", { class: "cronica-lista" });
+  const resumen = el("summary", {}, "Crónica del combate");
+  const nodo = el("details", { class: "cronica" }, resumen, lista);
+  function actualizar(cronica = []) {
+    resumen.textContent = cronica.length ? `Crónica del combate · ${cronica.length} ${cronica.length === 1 ? "turno" : "turnos"}` : "Crónica del combate";
+    lista.replaceChildren(
+      ...(cronica.length
+        ? cronica.map((t) => el("li", {}, el("span", { class: "cronica-turno" }, `Turno ${t.turno}`), el("ul", {}, ...t.eventos.map((ev) => el("li", { class: `ev-${ev.tipo}` }, texto(ev))))))
+        : [el("li", { class: "tenue" }, "Aún no ha pasado nada.")])
+    );
+    lista.scrollTop = lista.scrollHeight;
+  }
+  return { nodo, actualizar };
+}
+
 const firmaDe = (v) => `${v.fase}|${v.turno}|${JSON.stringify(v.eventos)}`;
 
 // Controlador del combate de un jugador: mantiene la arena entre redibujados para que
@@ -252,6 +271,7 @@ const firmaDe = (v) => `${v.fase}|${v.turno}|${JSON.stringify(v.eventos)}`;
 export function crearControladorCombate({ acciones, contexto }) {
   const nodo = el("div", { class: "combate" });
   const zonaControles = el("div", { class: "zona-controles" });
+  const cronica = crearCronica(textoEvento);
   let arena = null;
   let ultima = null; // última vista recibida
   let firmaMostrada = null; // turno y eventos que ya se han reproducido
@@ -272,6 +292,7 @@ export function crearControladorCombate({ acciones, contexto }) {
   function pintarControles() {
     if (!ultima || ultima.fase === "seleccion" || !arena) return;
     if (reproduciendo) return zonaControles.replaceChildren(esperaTurno("Resolviendo el turno…"));
+    cronica.actualizar(ultima.cronica);
     if (ultima.yo.debeCambiar) arena.narrar("¡Tu criatura ha caído!");
     zonaControles.replaceChildren(controlesJugador(ultima, acciones));
   }
@@ -293,7 +314,7 @@ export function crearControladorCombate({ acciones, contexto }) {
     }
     if (!arena) {
       arena = crearArena();
-      nodo.replaceChildren(arena.nodo, zonaControles);
+      nodo.replaceChildren(arena.nodo, zonaControles, cronica.nodo);
       sincronizar(v);
       firmaMostrada = firmaDe(v);
       arena.narrar(v.eventos.length ? textoEvento(v.eventos[v.eventos.length - 1]) : "¡Que empiece el combate!");
@@ -373,6 +394,7 @@ export function crearControladorEspectador({ salir }) {
   const nodo = el("div", { class: "partida-actual espectador" });
   const cabecera = el("div", { class: "partida-cabecera" });
   const estado = el("div", { class: "controles espera-turno" });
+  const cronica = crearCronica(textoEventoEspectador);
   let arena = null;
   let ultima = null;
   let firmaMostrada = null;
@@ -389,6 +411,7 @@ export function crearControladorEspectador({ salir }) {
 
   function pintarEstado() {
     const v = ultima;
+    if (!reproduciendo) cronica.actualizar(v.cronica);
     if (v.fase === "terminada") return estado.replaceChildren(el("strong", {}, v.ganador ? `¡${v.ganador} gana el combate!` : "¡Empate!"));
     if (v.fase === "seleccion") return estado.replaceChildren(el("span", { class: "puntos", "aria-hidden": "true" }), "Los jugadores están eligiendo a sus campeones…");
     const listos = v.jugadores.filter((j) => j.eleccionHecha).map((j) => j.nombre);
@@ -406,7 +429,7 @@ export function crearControladorEspectador({ salir }) {
     );
     if (!arena) {
       arena = crearArena();
-      nodo.replaceChildren(cabecera, arena.nodo, estado);
+      nodo.replaceChildren(cabecera, arena.nodo, estado, cronica.nodo);
       sincronizar(v);
       firmaMostrada = firmaDe(v);
       arena.narrar(v.eventos.length ? textoEventoEspectador(v.eventos[v.eventos.length - 1]) : "");

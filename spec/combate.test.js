@@ -355,3 +355,47 @@ test("RF-28: el espectador sabe a qué lado pertenece cada evento aunque los nom
   assert.deepEqual(ataques.map((e) => e.lado).sort(), [0, 1]);
   assert.equal(ataques.find((e) => e.lado === 0).movimiento, "Llamarada");
 });
+
+// ---------- RF-29: crónica completa ----------
+
+test("RF-29: la crónica guarda todos los turnos en orden, no solo el último", () => {
+  const c = combate(["pirolince", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("embestida"));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  c.elegirAccion(ANA, cambiar(1));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const v = c.vista(ANA);
+  assert.deepEqual(v.cronica.map((t) => t.turno), [1, 2]);
+  assert.deepEqual(v.cronica[0].eventos.map((e) => e.tipo), ["ataque", "ataque"]);
+  assert.equal(v.cronica[1].eventos[0].tipo, "cambio");
+  assert.deepEqual(v.cronica[1].eventos, v.eventos, "la última entrada es el último turno");
+});
+
+test("RF-29: la crónica de cada jugador usa su punto de vista y la del espectador, nombres", () => {
+  const c = combate(["pirolince", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("llamarada"));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const deAna = c.vista(ANA).cronica[0].eventos.find((e) => e.movimiento === "Llamarada");
+  const deLuis = c.vista(LUIS).cronica[0].eventos.find((e) => e.movimiento === "Llamarada");
+  assert.equal(deAna.quien, "yo");
+  assert.equal(deLuis.quien, "rival");
+  const esp = c.vistaEspectador({ [ANA]: "Ana", [LUIS]: "Luis" }).cronica[0].eventos.find((e) => e.movimiento === "Llamarada");
+  assert.equal(esp.quien, "Ana");
+  assert.equal(esp.lado, 0);
+  assert.ok(!JSON.stringify(c.vistaEspectador({ [ANA]: "Ana", [LUIS]: "Luis" })).includes("@"), "sin emails");
+});
+
+test("RF-29: los cambios obligados y el abandono también quedan en la crónica", () => {
+  const c = combate(["voltarda", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  // Voltarda (65 PS) cae ante Temblor de Rocadonte tras cambiar Luis.
+  c.elegirAccion(ANA, atacar("embestida"));
+  c.elegirAccion(LUIS, cambiar(1));
+  c.elegirAccion(ANA, atacar("embestida"));
+  c.elegirAccion(LUIS, atacar("temblor"));
+  if (c.vista(ANA).yo.debeCambiar) c.elegirAccion(ANA, cambiar(1));
+  c.abandonar(LUIS);
+  const cronica = c.vista(ANA).cronica;
+  const tipos = cronica.flatMap((t) => t.eventos.map((e) => e.tipo));
+  assert.equal(tipos[tipos.length - 1], "fin");
+  assert.ok(cronica.length >= 3);
+});
