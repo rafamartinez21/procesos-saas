@@ -139,6 +139,9 @@ button[disabled] { opacity: 0.5; cursor: not-allowed; }
 @media (min-width: 640px) { .campo-batalla { grid-template-columns: 1fr 1fr; } }
 .ficha { background: var(--fondo); border: 1px solid var(--borde); border-radius: 8px; padding: 10px 12px; }
 .ficha.debilitada { opacity: 0.55; }
+.retrato { display: block; }
+.retrato-tarjeta { width: 96px; height: 96px; align-self: center; }
+.retrato-ficha { width: 120px; height: 120px; margin: 0 auto; }
 .ficha-titulo { margin: 0 0 4px; font-size: 0.8rem; color: var(--suave); }
 .ps { position: relative; height: 20px; margin-top: 8px; background: var(--borde); border-radius: 999px; overflow: hidden; }
 .ps-relleno { height: 100%; transition: width 0.4s ease; }

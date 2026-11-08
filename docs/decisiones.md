@@ -163,3 +163,10 @@ timestamp: 2026-10-28
 - **Qué se decidió:** el espectador ve de cada jugador la criatura en combate, cuántas le quedan y si ya ha elegido su acción, pero nunca el banquillo ni la acción elegida. Puede leer el chat, pero no escribir. Se le avisa desde una sala de Socket.IO distinta de la de los jugadores.
 - **Por qué:** si viera la acción o el banquillo podría chivárselo al rival por otro canal. La sala aparte garantiza que nunca recibe por error la vista privada de un jugador, y una prueba lo comprueba. Que el chat sea de solo lectura evita que el público moleste a los jugadores.
 - **Estado:** vigente.
+
+## D-27 Los retratos de las criaturas se dibujan con SVG desde el código
+
+- **Qué se decidió:** cada criatura tiene un retrato SVG construido en el cliente con figuras simples ([cliente/retratos.js](../cliente/retratos.js)), con la paleta de su elemento. No hay archivos de imagen. El retrato del rival se dibuja en espejo para que las dos criaturas se miren.
+- **Por qué:** los dibujos son originales y no dependen de imágenes de terceros. Pesan unos pocos kilobytes, se ven nítidos a cualquier tamaño y se pueden animar con CSS. Como el catálogo también está en el código (D-22), una prueba comprueba que ninguna criatura se queda sin retrato.
+- **Estado:** vigente.
+

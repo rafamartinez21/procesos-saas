@@ -31,7 +31,7 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 | ID | Requisito | Estimación | Estado |
 |---|---|---|---|
 | RF-26 | Identidad visual propia de Aetheria en todo el juego: portada, vestíbulo, elección de equipo y resultado, adaptada a móvil | 8 h | pendiente |
-| RF-27 | Retratos originales de las doce criaturas | 6 h | pendiente |
+| RF-27 | Retratos originales de las doce criaturas | 6 h | hecho |
 | RF-28 | Arena de combate con el turno animado paso a paso (ataque, impacto, daño y PS); sin animaciones si el sistema pide reducir el movimiento | 8 h | pendiente |
 | RF-29 | Crónica completa del combate, turno a turno, también tras reconectarse | 2 h | pendiente |
 

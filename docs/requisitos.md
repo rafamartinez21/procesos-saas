@@ -60,3 +60,8 @@ Los requisitos del juego se definen en [sprint-2.md](sprint-2.md). Aquí aparece
 ## Sprint 3: nueva interfaz y más estrategia
 
 Los requisitos se definen en [sprint-3.md](sprint-3.md). Aquí aparecen los que ya tienen evidencia.
+
+| ID | Requisito | Estado | Evidencia |
+|---|---|---|---|
+| RF-27 | Retratos originales de las doce criaturas | hecho | [cliente/retratos.js](../cliente/retratos.js): doce dibujos SVG, paletas e iconos de los seis elementos y el emblema del juego (D-27). Se usan en la elección de equipo, en el combate (el rival en espejo) y en el modo espectador. Pruebas en [spec/retratos.test.js](../spec/retratos.test.js): cada criatura del catálogo tiene su dibujo, cada elemento su paleta e icono, el SVG es accesible y los dibujos son distintos entre sí. |
+
