@@ -39,9 +39,6 @@ Estados: **hecho** (se cumple tal como lo pide la especificación, con evidencia
 ## Sprint 2: Ecos de Aetheria
 
 Los requisitos del juego se definen en [sprint-2.md](sprint-2.md). Aquí aparecen los que ya tienen evidencia.
-
-| ID | Requisito | Estado | Evidencia |
-|---|---|---|---|
 | RF-11 | Crear una partida | hecho | `Salas.crearPartida` en [servidor/juego/salas.js](../servidor/juego/salas.js) y evento `partida:crear` en [servidor/tiempo-real.js](../servidor/tiempo-real.js). Pruebas en [spec/salas.test.js](../spec/salas.test.js) y [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
 | RF-12 | Lista de partidas abiertas en directo | hecho | `Salas.listarAbiertas`; el servidor emite `partidas` a todos en cada cambio. Prueba "crear una partida responde con ella y avisa en directo a los demás jugadores". |
 | RF-13 | Unirse a una partida | hecho | `Salas.unirse` (máximo dos; `PARTIDA_LLENA`, `PARTIDA_NO_ENCONTRADA`, `YA_EN_PARTIDA`) y evento `partida:unirse`. |
@@ -59,3 +56,7 @@ Los requisitos del juego se definen en [sprint-2.md](sprint-2.md). Aquí aparece
 | RF-22 | Chat dentro de la partida | hecho | `Salas.enviarMensaje` y `Salas.chatDe` en [servidor/juego/salas.js](../servidor/juego/salas.js): texto limpio (sin caracteres de control), de 1 a 200 caracteres, como mucho 5 mensajes cada 10 s por jugador y los últimos 50 guardados para quien se reconecta. Eventos `chat:enviar`, `chat:mensaje` y `chat:historial`; en el cliente se pinta con `textContent`. Pruebas en [spec/salas.test.js](../spec/salas.test.js) y [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
 | RF-23 | Modo espectador | hecho | `Salas.listarEnCurso`, `observar` y `dejarDeObservar`, y `Combate.vistaEspectador`: los dos jugadores por igual, sin banquillos, acciones elegidas ni emails. El espectador lee el chat pero no escribe. Eventos `partida:observar`, `partida:dejar-observar`, `partidas:en-curso`, `espectador:estado` y `espectador:fin`, con una sala de Socket.IO aparte para que no reciba avisos de jugador. Pruebas en [spec/salas.test.js](../spec/salas.test.js) y [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
 | RF-24 | Reconexión a una partida en curso | hecho | Al perder la última conexión hay 30 s de margen (`ESPERA_RECONEXION_MS` en [servidor/tiempo-real.js](../servidor/tiempo-real.js)). Socket.IO se vuelve a conectar solo y el servidor reenvía partida, combate, chat o vista de espectador, o `null` si ya no queda nada; pasado el margen, el que no vuelve pierde. El cliente avisa mientras reconecta. Pruebas "si se vuelve a conectar dentro del margen (recargar la página), sigue en su partida", "al volver a conectarse en mitad del combate se recibe la vista del combate" y "RF-24: …" en [spec/tiempo-real.test.js](../spec/tiempo-real.test.js). |
+
+## Sprint 3: nueva interfaz y más estrategia
+
+Los requisitos se definen en [sprint-3.md](sprint-3.md). Aquí aparecen los que ya tienen evidencia.

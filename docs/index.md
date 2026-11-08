@@ -1,6 +1,6 @@
-# Bundle OKF — Sprints 1 y 2
+# Bundle OKF — Sprints 1, 2 y 3
 
-Documentación de los Sprints 1 y 2 del proyecto de Procesos de Ingeniería del Software (curso 2026-2027) en formato OKF (Markdown con frontmatter). Describe el proyecto tal como está en el repositorio. Cómo ejecutarlo, probarlo y configurarlo está en el [README](../README.md).
+Documentación de los Sprints 1, 2 y 3 del proyecto de Procesos de Ingeniería del Software (curso 2026-2027) en formato OKF (Markdown con frontmatter). Describe el proyecto tal como está en el repositorio. Cómo ejecutarlo, probarlo y configurarlo está en el [README](../README.md).
 
 Tablero de Donetonic (requiere iniciar sesión): https://app.donetonic.com/workspaces/1/projects/1/backlog
 
@@ -13,3 +13,4 @@ Tablero de Donetonic (requiere iniciar sesión): https://app.donetonic.com/works
 | [procesos.md](procesos.md) | Flujo de trabajo, integración continua y despliegue continuo. |
 | [sprint-1.md](sprint-1.md) | Lo hecho en cada hito y retrospectiva del Sprint 1. |
 | [sprint-2.md](sprint-2.md) | Objetivo del Sprint 2 (juego Ecos de Aetheria), hitos 5 a 8 con sus requisitos, lo hecho en cada uno y retrospectiva. |
+| [sprint-3.md](sprint-3.md) | Objetivo del Sprint 3 (nueva interfaz y más estrategia), hitos 9 a 11 con requisitos y estimaciones. |
