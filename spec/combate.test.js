@@ -310,3 +310,48 @@ test("abandonar durante la elección de equipos también da la victoria al rival
   c.abandonar(ANA);
   assert.equal(c.vista(LUIS).ganador, "yo");
 });
+
+// ---------- RF-28: datos para animar el turno ----------
+
+test("RF-28: el ataque lleva el elemento del movimiento y los PS que le quedan al objetivo", () => {
+  const c = combate(["pirolince", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("llamarada"));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const ataques = c.vista(ANA).eventos.filter((e) => e.tipo === "ataque");
+  const mio = ataques.find((e) => e.quien === "yo");
+  assert.equal(mio.elemento, "fuego");
+  assert.equal(mio.psObjetivo, c.vista(ANA).rival.activa.ps);
+  const suyo = ataques.find((e) => e.quien === "rival");
+  assert.equal(suyo.elemento, "neutro");
+  assert.equal(suyo.psObjetivo, c.vista(ANA).yo.equipo[0].ps);
+});
+
+test("RF-28: el cambio lleva la criatura que entra con sus PS para poder dibujarla", () => {
+  const c = combate(["pirolince", "brason", "musgolem"], ["marejon", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, cambiar(1));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const cambio = c.vista(LUIS).eventos.find((e) => e.tipo === "cambio");
+  assert.equal(cambio.quien, "rival");
+  assert.equal(cambio.id, "brason");
+  assert.equal(cambio.elemento, "fuego");
+  assert.equal(cambio.psMax, 95);
+  assert.equal(cambio.ps, 95);
+});
+
+test("RF-28: la vista dice lo eficaz que es cada movimiento contra la criatura del rival", () => {
+  const c = combate(["pirolince", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  const v = c.vista(ANA);
+  // Pirolince (fuego) contra Musgolem (planta).
+  assert.deepEqual(v.yo.eficacias, { llamarada: 2, ascuas: 2, embestida: 1, vendaval: 2 });
+  assert.equal(c.vista(LUIS).yo.eficacias.drenaje, 0.5); // planta contra fuego
+});
+
+test("RF-28: el espectador sabe a qué lado pertenece cada evento aunque los nombres coincidan", () => {
+  const c = combate(["pirolince", "marejon", "musgolem"], ["musgolem", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("llamarada"));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const v = c.vistaEspectador({ [ANA]: "Igual", [LUIS]: "Igual" });
+  const ataques = v.eventos.filter((e) => e.tipo === "ataque");
+  assert.deepEqual(ataques.map((e) => e.lado).sort(), [0, 1]);
+  assert.equal(ataques.find((e) => e.lado === 0).movimiento, "Llamarada");
+});

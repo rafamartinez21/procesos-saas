@@ -5,6 +5,7 @@
 
 import { el } from "./dom.js";
 import { retrato, iconoElemento } from "./retratos.js";
+import { crearArena } from "./arena.js";
 
 const ELEMENTO = {
   fuego: "Fuego",
@@ -19,29 +20,6 @@ const ELEMENTO = {
 const ESTADO = { quemado: "Quemado", congelado: "Congelado", paralizado: "Paralizado" };
 
 const etiquetaElemento = (e) => el("span", { class: `elemento elem-${e}` }, iconoElemento(e), ELEMENTO[e] || e);
-
-function barraPs(c) {
-  const pct = Math.round((100 * c.ps) / c.psMax);
-  const nivel = pct > 50 ? "alta" : pct > 20 ? "media" : "baja";
-  return el(
-    "div",
-    { class: "ps", role: "meter", "aria-valuemin": "0", "aria-valuemax": String(c.psMax), "aria-valuenow": String(c.ps), "aria-label": `PS de ${c.nombre}` },
-    el("div", { class: `ps-relleno ps-${nivel}`, style: `width:${pct}%` }),
-    el("span", { class: "ps-texto" }, `${c.ps} / ${c.psMax} PS`)
-  );
-}
-
-// espejo: la criatura del rival mira hacia la izquierda, de cara a la tuya.
-function fichaCriatura(c, titulo, { espejo = false } = {}) {
-  return el(
-    "div",
-    { class: `ficha elem-borde-${c.elemento}${c.ps === 0 ? " debilitada" : ""}` },
-    retrato(c.id, { elemento: c.elemento, espejo, titulo: c.nombre, clase: "retrato retrato-ficha" }),
-    el("p", { class: "ficha-titulo" }, titulo),
-    el("p", { class: "ficha-nombre" }, c.nombre, " ", etiquetaElemento(c.elemento), c.estado ? el("span", { class: `estado estado-${c.estado}` }, ESTADO[c.estado]) : null),
-    barraPs(c)
-  );
-}
 
 // Texto de un evento del turno, desde el punto de vista del jugador.
 function textoEvento(ev) {
@@ -183,53 +161,9 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro) {
   );
 }
 
-// ---------- combate (RF-17) y final (RF-18) ----------
+// ---------- combate (RF-17, RF-18) en la arena animada (RF-28) ----------
 
-function pantallaCombate(vista, acciones) {
-  const mia = vista.yo.equipo[vista.yo.activa];
-  const registro = vista.eventos.length
-    ? el("ol", { class: "registro", "aria-live": "polite" }, ...vista.eventos.map((ev) => el("li", {}, textoEvento(ev))))
-    : el("p", { class: "suave" }, "¡Que empiece el combate!");
-
-  const campo = el(
-    "div",
-    { class: "campo-batalla" },
-    vista.rival.activa ? fichaCriatura(vista.rival.activa, `Rival · le quedan ${vista.rival.restantes}`, { espejo: true }) : null,
-    fichaCriatura(mia, "Tu criatura")
-  );
-
-  let controles;
-  if (vista.fase === "terminada") {
-    controles = resultado(vista, acciones);
-  } else if (vista.yo.debeCambiar) {
-    controles = el("div", {}, el("p", { class: "aviso-error" }, "Tu criatura ha caído: elige quién sale ahora."), banquillo(vista, acciones));
-  } else if (vista.rival.debeCambiar) {
-    controles = el("p", { class: "suave" }, "Tu rival está eligiendo otra criatura…");
-  } else if (vista.yo.eleccionHecha) {
-    controles = el("p", { class: "suave" }, vista.rival.eleccionHecha ? "Resolviendo el turno…" : "Esperando la acción de tu rival…");
-  } else {
-    controles = el(
-      "div",
-      {},
-      el("p", {}, `Turno ${vista.turno}: ¿qué hace ${mia.nombre}?`),
-      el(
-        "div",
-        { class: "movimientos" },
-        ...mia.movimientos.map((m) =>
-          el(
-            "button",
-            { type: "button", class: `mov elem-fondo-${m.elemento}`, onclick: () => acciones.atacar(m.id) },
-            el("span", { class: "mov-nombre" }, iconoElemento(m.elemento), m.nombre),
-            el("span", { class: "mov-detalle" }, `${ELEMENTO[m.elemento]} · Pot ${m.potencia} · Prec ${m.precision}%`)
-          )
-        )
-      ),
-      banquillo(vista, acciones)
-    );
-  }
-
-  return el("div", { class: "combate" }, campo, controles, el("h3", {}, "Último turno"), registro);
-}
+const TEXTO_EFICACIA = { 2: ["Muy eficaz", "eficaz"], 0.5: ["Poco eficaz", "flojo"] };
 
 function resultado(vista, acciones) {
   const texto = vista.ganador === "yo" ? "¡Victoria!" : vista.ganador === "rival" ? "Derrota" : "Empate";
@@ -243,30 +177,158 @@ function resultado(vista, acciones) {
   );
 }
 
-function banquillo(vista, acciones) {
-  const opciones = vista.yo.equipo
-    .map((c, i) => ({ c, i }))
-    .filter(({ c, i }) => i !== vista.yo.activa);
+// Criaturas del banquillo como botones con su retrato y sus PS.
+function banquillo(vista, acciones, { titulo = "Cambiar a" } = {}) {
+  const opciones = vista.yo.equipo.map((c, i) => ({ c, i })).filter(({ i }) => i !== vista.yo.activa);
   return el(
     "div",
     { class: "banquillo" },
-    el("span", { class: "suave" }, "Cambiar a: "),
-    ...opciones.map(({ c, i }) =>
-      el(
-        "button",
-        { type: "button", class: "secundario", disabled: c.ps === 0, onclick: () => acciones.cambiar(i) },
-        `${c.nombre} (${c.ps}/${c.psMax})`
-      )
+    el("span", { class: "etiqueta-seccion" }, titulo),
+    el(
+      "div",
+      { class: "banquillo-lista" },
+      ...opciones.map(({ c, i }) => {
+        const pct = Math.round((100 * c.ps) / c.psMax);
+        return el(
+          "button",
+          { type: "button", class: "suplente", disabled: c.ps === 0, onclick: () => acciones.cambiar(i), "aria-label": `Cambiar a ${c.nombre}, ${c.ps} de ${c.psMax} PS` },
+          retrato(c.id, { elemento: c.elemento, clase: "retrato" }),
+          el(
+            "span",
+            { class: "suplente-datos" },
+            el("strong", {}, c.nombre),
+            el("span", { class: "mini-ps" }, el("span", { class: `ps-${pct > 50 ? "alta" : pct > 20 ? "media" : "baja"}`, style: `width:${pct}%` })),
+            el("small", {}, c.ps === 0 ? "Debilitada" : `${c.ps}/${c.psMax} PS`)
+          )
+        );
+      })
     )
   );
 }
 
-// vista: la del servidor. catalogo: GET /api/criaturas. seleccion: ids marcados (estado local).
-export function dibujarCombate(vista, { catalogo, seleccion, filtro = null, acciones }) {
-  if (vista.fase === "seleccion") return pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro);
-  // Si alguien abandonó antes de elegir equipos, solo hay resultado.
-  if (!vista.yo.equipo) return el("div", { class: "combate" }, resultado(vista, acciones));
-  return pantallaCombate(vista, acciones);
+function botonesMovimientos(vista, acciones) {
+  const mia = vista.yo.equipo[vista.yo.activa];
+  const eficacias = vista.yo.eficacias || {};
+  return el(
+    "div",
+    { class: "movimientos" },
+    ...mia.movimientos.map((m) => {
+      const [aviso, clase] = TEXTO_EFICACIA[eficacias[m.id]] || [];
+      return el(
+        "button",
+        { type: "button", class: `mov elem-fondo-${m.elemento}`, onclick: () => acciones.atacar(m.id) },
+        el("span", { class: "mov-nombre" }, iconoElemento(m.elemento), m.nombre),
+        el("span", { class: "mov-detalle" }, `${ELEMENTO[m.elemento]} · Pot ${m.potencia} · Prec ${m.precision}%`),
+        aviso ? el("span", { class: `mov-eficacia ${clase}` }, aviso) : null
+      );
+    })
+  );
+}
+
+const esperaTurno = (texto) => el("div", { class: "controles espera-turno" }, el("span", { class: "puntos", "aria-hidden": "true" }), texto);
+
+function controlesJugador(vista, acciones) {
+  if (vista.fase === "terminada") return resultado(vista, acciones);
+  const mia = vista.yo.equipo[vista.yo.activa];
+  if (vista.yo.debeCambiar) {
+    return el("div", { class: "controles" }, el("p", { class: "aviso-error" }, `${mia.nombre} no puede seguir. ¿Quién sale ahora?`), banquillo(vista, acciones, { titulo: "Elige quién sale" }));
+  }
+  if (vista.rival.debeCambiar) return esperaTurno("Tu rival está eligiendo otra criatura…");
+  if (vista.yo.eleccionHecha) return esperaTurno(vista.rival.eleccionHecha ? "Resolviendo el turno…" : "Acción elegida. Esperando a tu rival…");
+  return el(
+    "div",
+    { class: "controles" },
+    el("p", { class: "pregunta" }, el("span", { class: "etiqueta-seccion" }, `Turno ${vista.turno}`), " ", `¿Qué hará ${mia.nombre}?`),
+    botonesMovimientos(vista, acciones),
+    banquillo(vista, acciones)
+  );
+}
+
+const firmaDe = (v) => `${v.fase}|${v.turno}|${JSON.stringify(v.eventos)}`;
+
+// Controlador del combate de un jugador: mantiene la arena entre redibujados para que
+// las animaciones no se corten, y reproduce cada turno nuevo antes de mostrar los botones.
+//   contexto(): { catalogo, seleccion, filtro } para la elección de equipo.
+export function crearControladorCombate({ acciones, contexto }) {
+  const nodo = el("div", { class: "combate" });
+  const zonaControles = el("div", { class: "zona-controles" });
+  let arena = null;
+  let ultima = null; // última vista recibida
+  let firmaMostrada = null; // turno y eventos que ya se han reproducido
+  let reproduciendo = false;
+  let cola = Promise.resolve();
+
+  const ladoDe = (ev) => (ev.quien === "yo" ? "abajo" : "arriba");
+  const dueno = (posicion) => (posicion === "abajo" ? "Tú" : "Rival");
+
+  // Coloca las dos criaturas tal como dice la vista, sin animar.
+  function sincronizar(v) {
+    const mia = v.yo.equipo[v.yo.activa];
+    arena.colocar("abajo", mia, { dueno: "Tú", restantes: v.yo.equipo.filter((c) => c.ps > 0).length, total: v.yo.equipo.length });
+    if (v.rival.activa) arena.colocar("arriba", v.rival.activa, { dueno: "Rival", restantes: v.rival.restantes, total: 3 });
+    else arena.vaciar("arriba");
+  }
+
+  function pintarControles() {
+    if (!ultima || ultima.fase === "seleccion" || !arena) return;
+    if (reproduciendo) return zonaControles.replaceChildren(esperaTurno("Resolviendo el turno…"));
+    if (ultima.yo.debeCambiar) arena.narrar("¡Tu criatura ha caído!");
+    zonaControles.replaceChildren(controlesJugador(ultima, acciones));
+  }
+
+  function actualizar(v) {
+    ultima = v;
+    if (v.fase === "seleccion") {
+      arena = null;
+      firmaMostrada = null;
+      const { catalogo, seleccion, filtro } = contexto();
+      nodo.replaceChildren(pantallaSeleccion(v, catalogo, acciones, seleccion, filtro));
+      return;
+    }
+    // Si alguien abandonó antes de elegir equipos, solo hay resultado.
+    if (!v.yo.equipo) {
+      arena = null;
+      nodo.replaceChildren(resultado(v, acciones));
+      return;
+    }
+    if (!arena) {
+      arena = crearArena();
+      nodo.replaceChildren(arena.nodo, zonaControles);
+      sincronizar(v);
+      firmaMostrada = firmaDe(v);
+      arena.narrar(v.eventos.length ? textoEvento(v.eventos[v.eventos.length - 1]) : "¡Que empiece el combate!");
+      pintarControles();
+      return;
+    }
+    const f = firmaDe(v);
+    if (f === firmaMostrada || !v.eventos.length) {
+      if (!reproduciendo) sincronizar(v);
+      pintarControles();
+      return;
+    }
+    firmaMostrada = f;
+    cola = cola.then(async () => {
+      reproduciendo = true;
+      pintarControles();
+      const miArena = arena;
+      try {
+        await miArena.reproducir(v.eventos, { ladoDe, texto: textoEvento, duenoDe: dueno });
+      } finally {
+        reproduciendo = false;
+        if (arena === miArena && ultima.yo.equipo && ultima.fase !== "seleccion") {
+          sincronizar(ultima);
+          pintarControles();
+        }
+      }
+    });
+  }
+
+  // Vuelve a dibujar lo que no anima (la elección de equipo cambia con cada clic).
+  function refrescar() {
+    if (ultima && ultima.fase === "seleccion") actualizar(ultima);
+  }
+
+  return { nodo, actualizar, refrescar };
 }
 
 // ---------- espectador (RF-23) ----------
@@ -304,32 +366,76 @@ function textoEventoEspectador(ev) {
   }
 }
 
-export function dibujarEspectador(vista, { salir }) {
-  const fichas = vista.jugadores.map((j, i) =>
-    j.activa
-      ? fichaCriatura(j.activa, `${j.nombre} · le quedan ${j.restantes}${vista.fase === "combate" && j.eleccionHecha ? " · ya ha elegido" : ""}`, { espejo: i === 1 })
-      : el("div", { class: "ficha" }, el("p", { class: "ficha-titulo" }, j.nombre), el("p", { class: "suave" }, j.eleccionHecha ? "Equipo elegido" : "Eligiendo equipo…"))
-  );
-  const estado =
-    vista.fase === "terminada"
-      ? el("p", { class: "aviso-ok" }, vista.ganador ? `Ganador: ${vista.ganador}` : "Empate")
-      : el("p", { class: "suave" }, vista.fase === "seleccion" ? "Los jugadores están eligiendo equipo…" : `Turno ${vista.turno}`);
-  return el(
-    "div",
-    { class: "partida-actual espectador" },
-    el(
-      "div",
-      { class: "partida-cabecera" },
-      el("h3", {}, "Mirando: ", vista.jugadores.map((j) => j.nombre).join(" contra ")),
-      el("button", { type: "button", class: "secundario", onclick: salir }, "Dejar de mirar")
-    ),
-    estado,
-    el("div", { class: "campo-batalla" }, ...fichas),
-    el("h3", {}, "Último turno"),
-    vista.eventos.length
-      ? el("ol", { class: "registro", "aria-live": "polite" }, ...vista.eventos.map((ev) => el("li", {}, textoEventoEspectador(ev))))
-      : el("p", { class: "suave" }, "Aún no ha pasado nada.")
-  );
+// Controlador del modo espectador: la misma arena, con el primer jugador abajo y el
+// segundo arriba. Los eventos traen "lado" (0 o 1), así que dos jugadores con el mismo
+// nombre no se confunden.
+export function crearControladorEspectador({ salir }) {
+  const nodo = el("div", { class: "partida-actual espectador" });
+  const cabecera = el("div", { class: "partida-cabecera" });
+  const estado = el("div", { class: "controles espera-turno" });
+  let arena = null;
+  let ultima = null;
+  let firmaMostrada = null;
+  let reproduciendo = false;
+  let cola = Promise.resolve();
+  const posicion = (i) => (i === 0 ? "abajo" : "arriba");
+
+  function sincronizar(v) {
+    v.jugadores.forEach((j, i) => {
+      if (j.activa) arena.colocar(posicion(i), j.activa, { dueno: j.nombre, restantes: j.restantes, total: 3 });
+      else arena.vaciar(posicion(i));
+    });
+  }
+
+  function pintarEstado() {
+    const v = ultima;
+    if (v.fase === "terminada") return estado.replaceChildren(el("strong", {}, v.ganador ? `¡${v.ganador} gana el combate!` : "¡Empate!"));
+    if (v.fase === "seleccion") return estado.replaceChildren(el("span", { class: "puntos", "aria-hidden": "true" }), "Los jugadores están eligiendo a sus campeones…");
+    const listos = v.jugadores.filter((j) => j.eleccionHecha).map((j) => j.nombre);
+    estado.replaceChildren(
+      el("span", { class: "puntos", "aria-hidden": "true" }),
+      reproduciendo ? "Resolviendo el turno…" : `Turno ${v.turno}${listos.length ? ` · ya ha elegido: ${listos.join(", ")}` : ""}`
+    );
+  }
+
+  function actualizar(v) {
+    ultima = v;
+    cabecera.replaceChildren(
+      el("div", {}, el("span", { class: "en-vivo" }, "En vivo"), el("h2", {}, v.jugadores[0].nombre, el("span", { class: "contra" }, " contra "), v.jugadores[1].nombre)),
+      el("div", { class: "acciones" }, el("button", { type: "button", class: "secundario pequeno", onclick: salir }, "Dejar de mirar"))
+    );
+    if (!arena) {
+      arena = crearArena();
+      nodo.replaceChildren(cabecera, arena.nodo, estado);
+      sincronizar(v);
+      firmaMostrada = firmaDe(v);
+      arena.narrar(v.eventos.length ? textoEventoEspectador(v.eventos[v.eventos.length - 1]) : "");
+      return pintarEstado();
+    }
+    const f = firmaDe(v);
+    if (f === firmaMostrada || !v.eventos.length) {
+      if (!reproduciendo) sincronizar(v);
+      return pintarEstado();
+    }
+    firmaMostrada = f;
+    cola = cola.then(async () => {
+      reproduciendo = true;
+      pintarEstado();
+      try {
+        await arena.reproducir(v.eventos, {
+          ladoDe: (ev) => posicion(ev.lado),
+          texto: textoEventoEspectador,
+          duenoDe: (p) => ultima.jugadores[p === "abajo" ? 0 : 1].nombre,
+        });
+      } finally {
+        reproduciendo = false;
+        sincronizar(ultima);
+        pintarEstado();
+      }
+    });
+  }
+
+  return { nodo, actualizar };
 }
 
 export { textoEvento, textoEventoEspectador };

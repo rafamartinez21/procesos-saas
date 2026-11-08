@@ -71,6 +71,8 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     if (this.fase !== fase) throw new ErrorNegocio("FASE_INCORRECTA", TEXTO_FASE[this.fase]);
   };
   const activa = (j) => j.equipo[j.activa];
+  // Evento de cambio con lo que el cliente necesita para dibujar a la criatura que entra (RF-28).
+  const eventoCambio = (email, c) => ({ tipo: "cambio", quien: email, criatura: c.nombre, id: c.id, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado });
   const vivas = (j) => j.equipo.filter((c) => c.ps > 0).length;
 
   // ---------- RF-16: elegir equipo ----------
@@ -108,7 +110,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       validarCambio(j, accion.indice);
       j.activa = accion.indice;
       j.debeCambiar = false;
-      this.eventos = [{ tipo: "cambio", quien: email, criatura: activa(j).nombre }];
+      this.eventos = [eventoCambio(email, activa(j))];
       return true;
     }
 
@@ -167,7 +169,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       const j = jugadores.get(e);
       if (j.accion.tipo === "cambiar") {
         j.activa = j.accion.indice;
-        eventos.push({ tipo: "cambio", quien: e, criatura: activa(j).nombre });
+        eventos.push(eventoCambio(e, activa(j)));
       }
     }
 
@@ -220,13 +222,14 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         })
       );
       d.ps -= danio;
-      eventos.push({ tipo: "ataque", quien: e, criatura: a.nombre, movimiento: mov.nombre, objetivo: d.nombre, danio, eficacia: ef });
+      // elemento y psObjetivo: para animar el golpe y la barra de PS paso a paso (RF-28).
+      eventos.push({ tipo: "ataque", quien: e, criatura: a.nombre, movimiento: mov.nombre, elemento: mov.elemento, objetivo: d.nombre, danio, eficacia: ef, psObjetivo: d.ps });
 
       if (mov.efecto && mov.efecto.drenar && a.ps < a.psMax) {
         const cura = Math.min(a.psMax - a.ps, Math.floor(danio * mov.efecto.drenar));
         if (cura > 0) {
           a.ps += cura;
-          eventos.push({ tipo: "drena", quien: e, criatura: a.nombre, cura });
+          eventos.push({ tipo: "drena", quien: e, criatura: a.nombre, cura, ps: a.ps });
         }
       }
       if (d.ps > 0 && mov.efecto && mov.efecto.estado && !d.estado && aleatorio() < mov.efecto.prob) {
@@ -246,7 +249,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         if (c.ps > 0 && c.estado === "quemado") {
           const danio = Math.min(c.ps, Math.max(1, Math.floor(c.psMax / 10)));
           c.ps -= danio;
-          eventos.push({ tipo: "quemadura", quien: e, criatura: c.nombre, danio });
+          eventos.push({ tipo: "quemadura", quien: e, criatura: c.nombre, danio, ps: c.ps });
           if (c.ps <= 0) debilitar(e, c, eventos);
         }
       }
@@ -290,7 +293,11 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       jugadores: emails.map(lado),
       eventos: this.eventos.map((ev) => {
         const copia = { ...ev };
-        if ("quien" in copia) copia.quien = nombre(copia.quien);
+        // lado: 0 o 1, el jugador al que se refiere (dos jugadores pueden llamarse igual).
+        if ("quien" in copia) {
+          copia.lado = emails.indexOf(copia.quien);
+          copia.quien = nombre(copia.quien);
+        }
         if ("ganador" in copia) copia.ganador = nombre(copia.ganador);
         return copia;
       }),
@@ -316,6 +323,12 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
           ? j.equipo.map((c) => ({ ...criatura(c), movimientos: c.movimientos.map((m) => ({ id: m, ...obtenerMovimiento(m) })) }))
           : null,
         activa: j.equipo ? j.activa : null,
+        // Eficacia de cada movimiento de la criatura en combate contra la del rival (RF-28):
+        // la calcula el servidor, el cliente solo la muestra.
+        eficacias:
+          this.fase === FASE_COMBATE && j.equipo && r.equipo
+            ? Object.fromEntries(activa(j).movimientos.map((m) => [m, eficacia(obtenerMovimiento(m).elemento, activa(r).elemento)]))
+            : null,
         eleccionHecha: Boolean(j.equipo) && (this.fase === FASE_SELECCION || Boolean(j.accion)),
         debeCambiar: j.debeCambiar,
       },
