@@ -61,7 +61,14 @@ test("todas las criaturas tienen id único, estadísticas válidas que suman 280
 
 test("los movimientos tienen potencia y precisión válidas y sus efectos son estados conocidos", () => {
   for (const [id, m] of Object.entries(MOVIMIENTOS)) {
-    assert.ok(m.potencia > 0 && m.precision > 0 && m.precision <= 100, id);
+    // Los de apoyo (RF-31) no hacen daño; el resto, sí.
+    assert.ok((m.apoyo ? m.potencia === 0 : m.potencia > 0) && m.precision > 0 && m.precision <= 100, id);
+    if (m.apoyo) {
+      const a = m.apoyo;
+      assert.ok(a.cura ? a.cura > 0 && a.cura <= 1 : ["propio", "rival"].includes(a.sobre) && ["ataque", "defensa", "velocidad"].includes(a.stat) && a.etapas !== 0, id);
+      // Los de subir son para uno mismo y los de bajar, para el rival.
+      if (!a.cura) assert.equal(a.sobre === "propio", a.etapas > 0, id);
+    }
     if (m.efecto && m.efecto.estado) {
       assert.ok(ESTADOS.includes(m.efecto.estado), id);
       assert.ok(m.efecto.prob > 0 && m.efecto.prob <= 1, id);
@@ -79,4 +86,12 @@ test("el catálogo público incluye los datos de cada movimiento", () => {
   assert.deepEqual(p.movimientos[0], { id: "torrente", ...MOVIMIENTOS.torrente });
   // No modifica el catálogo original.
   assert.equal(typeof CATALOGO.find((c) => c.id === "marejon").movimientos[0], "string");
+});
+
+test("RF-31: cada criatura lenta tiene un movimiento de apoyo y conserva uno de daño de su elemento", () => {
+  const conApoyo = CATALOGO.filter((c) => c.movimientos.some((m) => MOVIMIENTOS[m].apoyo)).map((c) => c.id).sort();
+  assert.deepEqual(conApoyo, ["brason", "chispardo", "marejon", "musgolem", "plumazul", "rocadonte"]);
+  for (const c of CATALOGO) {
+    assert.ok(c.movimientos.some((m) => MOVIMIENTOS[m].elemento === c.elemento && !MOVIMIENTOS[m].apoyo), `${c.id} sin ataque de su elemento`);
+  }
 });

@@ -598,3 +598,12 @@ td.acciones { display: flex; gap: 6px; }
 .cronica-lista ul li { margin: 2px 0 2px 8px; font-size: 0.88rem; color: var(--texto); }
 .cronica-lista .ev-debilitada, .cronica-lista .ev-fin { color: #ffa8a8; font-weight: 600; }
 .cronica-lista .ev-estado, .cronica-lista .ev-no-actua { color: var(--suave); }
+
+/* ---------- etapas de estadísticas (RF-31) ---------- */
+.mods { display: flex; gap: 4px; flex-wrap: wrap; flex: 1; justify-content: flex-end; }
+.mod { font-size: 0.62rem; font-weight: 800; padding: 0 6px; border-radius: 999px; letter-spacing: 0.02em; }
+.mod.sube { color: #1a1405; background: var(--oro); }
+.mod.baja { color: #fff; background: #4263eb; }
+.flotante.sube { color: var(--oro-claro); font-size: 1.15rem; }
+.flotante.baja { color: #91a7ff; font-size: 1.15rem; }
+

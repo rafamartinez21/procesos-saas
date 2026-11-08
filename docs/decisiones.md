@@ -182,3 +182,9 @@ timestamp: 2026-10-28
 - **Por qué:** así el cliente no tiene que recalcular daño ni eficacias, que son reglas del servidor (D-20); solo traduce datos a movimiento. Comparar la vista anterior con la nueva no bastaría para saber el orden de lo ocurrido. Mantener la arena entre redibujados evita que una actualización de la lista de partidas corte una animación.
 - **Estado:** vigente.
 
+## D-30 Movimientos de apoyo con etapas de -2 a +2 que se pierden al cambiar
+
+- **Qué se decidió:** seis movimientos de apoyo sin daño (Concentración, Escudo de roca, Viento de cola, Rugido, Nube de esporas y Marea curativa) sustituyen al movimiento redundante de las seis criaturas lentas y resistentes. Las etapas de ataque, defensa y velocidad van de -2 a +2 (+1 = x1,5, +2 = x2, -1 = x0,67, -2 = x0,5) y se pierden cuando la criatura sale del combate. Las etapas son públicas: las ven el rival y los espectadores, como el estado alterado. Los movimientos de subir son para uno mismo y los de bajar, para el rival.
+- **Por qué:** con solo ataques, la mejor jugada era siempre el movimiento más eficaz. Las etapas premian preparar el golpe y castigan quedarse demasiado tiempo, porque cambiar de criatura las borra. Dárselos a las criaturas lentas compensa que casi siempre atacan después. El tope de ±2 evita combates que se decidan solo acumulando etapas.
+- **Estado:** vigente.
+
