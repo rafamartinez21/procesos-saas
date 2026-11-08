@@ -10,7 +10,7 @@
 import { ClienteApi } from "./cliente-api.js";
 import { ClienteJuego } from "./cliente-juego.js";
 import { el } from "./dom.js";
-import { dibujarCombate, dibujarEspectador } from "./combate-vista.js";
+import { crearControladorCombate, crearControladorEspectador } from "./combate-vista.js";
 import { panelProgreso } from "./progreso-vista.js";
 import { retrato, emblema } from "./retratos.js";
 
@@ -288,6 +288,11 @@ async function pantallaPrincipal(usuario) {
 function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo = () => {} } = {}) {
   const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, conectado: false, catalogo: [], seleccion: [], filtro: null, chat: [] };
   const zona = el("div", { class: "vestibulo" });
+  // Controladores de la arena (RF-28): viven mientras dura el combate o mientras se mira
+  // una partida, para que redibujar el vestíbulo no corte las animaciones.
+  let controlador = null;
+  let espectador = null;
+  const contextoSeleccion = () => ({ catalogo: estado.catalogo, seleccion: estado.seleccion, filtro: estado.filtro });
   const nombre = usuario.nombre || usuario.email.split("@")[0];
 
   // El catálogo de criaturas solo hace falta para elegir equipo; se pide una vez.
@@ -327,6 +332,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       estado.partida = partida;
       if (!partida) {
         estado.combate = null;
+        controlador = null;
         estado.seleccion = [];
         estado.chat = [];
       }
@@ -439,7 +445,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
               )
             )
       ),
-      estado.combate ? dibujarCombate(estado.combate, { catalogo: estado.catalogo, seleccion: estado.seleccion, filtro: estado.filtro, acciones: accionesCombate }) : null,
+      controlador ? controlador.nodo : null,
       // Contra la máquina no hay nadie con quien hablar.
       p.jugadores.length === 2 && p.jugadores[1] !== "Autómata de Aetheria" ? panelChat : null
     );
@@ -483,6 +489,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       mostrarError(err);
     }
     estado.mirando = null;
+    espectador = null;
     estado.chat = [];
     dibujarChat();
     dibujar();
@@ -561,11 +568,16 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
   }
 
   function pintar() {
+    if (controlador) controlador.refrescar();
     const enDuelo = Boolean((estado.partida && estado.combate) || (estado.mirando && !estado.partida));
     alCambiarModo(enDuelo);
     // RF-23: mirando una partida ajena (solo lectura del combate y del chat).
     if (estado.mirando && !estado.partida) {
-      zona.replaceChildren(el("section", { class: "panel" }, dibujarEspectador(estado.mirando, { salir: dejarDeMirar }), el("div", { class: "chat", style: "margin-top:16px" }, el("h3", {}, "Chat del duelo"), listaChat)));
+      if (!espectador) {
+        espectador = crearControladorEspectador({ salir: dejarDeMirar });
+        espectador.actualizar(estado.mirando);
+      }
+      zona.replaceChildren(el("section", { class: "panel" }, espectador.nodo, el("div", { class: "chat", style: "margin-top:16px" }, el("h3", {}, "Chat del duelo"), listaChat)));
       return;
     }
     if (estado.partida && estado.combate) return zona.replaceChildren(panelPartida(estado.partida));
@@ -587,6 +599,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       estado.partida = p;
       if (!p) {
         estado.combate = null;
+        controlador = null;
         estado.seleccion = [];
         estado.filtro = null;
         if (!estado.mirando) estado.chat = [];
@@ -599,6 +612,8 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       if (v.fase === "terminada" && (!estado.combate || estado.combate.fase !== "terminada")) setTimeout(alTerminarCombate, 800);
       estado.combate = v;
       if (v.fase !== "seleccion") estado.seleccion = [];
+      if (!controlador) controlador = crearControladorCombate({ acciones: accionesCombate, contexto: contextoSeleccion });
+      controlador.actualizar(v);
       dibujar();
     },
     alCambiarEnCurso: (lista) => {
@@ -607,6 +622,8 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
     },
     alCambiarEspectador: (v) => {
       estado.mirando = v;
+      if (!v) espectador = null;
+      else if (espectador) espectador.actualizar(v);
       dibujar();
     },
     alConectar: () => {
@@ -616,6 +633,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
     alTerminarEspectador: () => {
       mostrarMensaje("La partida que mirabas ha terminado y los jugadores se han ido.", "info");
       estado.mirando = null;
+      espectador = null;
       estado.chat = [];
       dibujarChat();
       dibujar();

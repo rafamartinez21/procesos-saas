@@ -176,3 +176,9 @@ timestamp: 2026-10-28
 - **Por qué:** un juego necesita una ambientación coherente, y mantener dos temas dobla el trabajo de diseño de cada pantalla. El contraste del texto sobre el fondo oscuro se mantiene alto. Las fuentes son la única dependencia externa del cliente y no afectan al funcionamiento.
 - **Estado:** vigente.
 
+## D-29 El servidor manda en cada evento lo necesario para animarlo; el cliente solo reproduce
+
+- **Qué se decidió:** los eventos del turno llevan los datos para dibujarlos paso a paso: el ataque lleva el elemento del movimiento y los PS que le quedan al objetivo, el cambio lleva la criatura que entra con sus PS, y la quemadura y el drenaje llevan los PS resultantes. La vista del jugador incluye la eficacia de cada movimiento contra la criatura del rival, y la del espectador marca a qué jugador (`lado` 0 o 1) se refiere cada evento. En el cliente, la arena ([cliente/arena.js](../cliente/arena.js)) se conserva mientras dura el combate y reproduce cada turno nuevo en orden; los botones aparecen al terminar la reproducción, y al final se coloca todo exactamente como dice la última vista.
+- **Por qué:** así el cliente no tiene que recalcular daño ni eficacias, que son reglas del servidor (D-20); solo traduce datos a movimiento. Comparar la vista anterior con la nueva no bastaría para saber el orden de lo ocurrido. Mantener la arena entre redibujados evita que una actualización de la lista de partidas corte una animación.
+- **Estado:** vigente.
+
