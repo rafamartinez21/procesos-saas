@@ -4,6 +4,7 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-08 | Corrección del OKF: la prueba de la máquina recorre 349 turnos (825 acciones), no «miles de turnos» | [PR #32](https://github.com/rafamartinez21/procesos-saas/pull/32) |
 | 2026-11-04 | Etiqueta `hito-8` | [hito-8](https://github.com/rafamartinez21/procesos-saas/tree/hito-8) |
 | 2026-11-04 | RF-24: reconexión a una partida en curso | [PR #30](https://github.com/rafamartinez21/procesos-saas/pull/30) |
 | 2026-11-04 | RF-23: modo espectador (D-26) | [PR #29](https://github.com/rafamartinez21/procesos-saas/pull/29) |
