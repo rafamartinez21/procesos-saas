@@ -4,6 +4,8 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-09 | Etiqueta `hito-4`: RF-02 y RF-04 cerrados y comprobados en producción | [hito-4](https://github.com/rafamartinez21/procesos-saas/tree/hito-4) |
+| 2026-11-09 | Cierre del hito 4: credenciales de Google en Cloud Run; `/api/auth/google` redirige a Google | [PR #33](https://github.com/rafamartinez21/procesos-saas/pull/33) |
 | 2026-11-08 | Corrección del OKF: la prueba de la máquina recorre 349 turnos (825 acciones), no «miles de turnos» | [PR #32](https://github.com/rafamartinez21/procesos-saas/pull/32) |
 | 2026-11-04 | OKF: cierre del Sprint 2 (retrospectiva, procesos y README) | [PR #31](https://github.com/rafamartinez21/procesos-saas/pull/31) |
 | 2026-11-04 | Etiqueta `hito-8` | [hito-8](https://github.com/rafamartinez21/procesos-saas/tree/hito-8) |
