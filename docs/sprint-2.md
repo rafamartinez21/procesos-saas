@@ -87,7 +87,7 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 - **Qué funcionó:**
   - separar la lógica del juego de Socket.IO (D-20) permitió probar el combate entero con pruebas unitarias deterministas (azar inyectado) antes de conectarlo;
   - las pruebas de tiempo real con el cliente oficial de Socket.IO detectaron una condición de carrera en el orden de los avisos;
-  - la prueba de 40 partidas máquina contra máquina recorre miles de turnos y confirma que la máquina nunca hace una acción inválida.
+  - la prueba de 40 partidas máquina contra máquina recorre 349 turnos (825 acciones) y confirma que la máquina nunca hace una acción inválida.
 - **Qué mejorar:**
   - el PR #26 se integró sin esperar a la CI;
   - las partidas en curso viven en memoria (D-21), así que el servicio necesita una sola instancia y un reinicio termina las partidas.
