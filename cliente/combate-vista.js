@@ -4,6 +4,7 @@
 // los clics a acciones, que se entregan a las funciones de "acciones".
 
 import { el } from "./dom.js";
+import { retrato } from "./retratos.js";
 
 const ELEMENTO = {
   fuego: "Fuego",
@@ -30,10 +31,12 @@ function barraPs(c) {
   );
 }
 
-function fichaCriatura(c, titulo) {
+// espejo: la criatura del rival mira hacia la izquierda, de cara a la tuya.
+function fichaCriatura(c, titulo, { espejo = false } = {}) {
   return el(
     "div",
     { class: `ficha elem-borde-${c.elemento}${c.ps === 0 ? " debilitada" : ""}` },
+    retrato(c.id, { elemento: c.elemento, espejo, titulo: c.nombre, clase: "retrato retrato-ficha" }),
     el("p", { class: "ficha-titulo" }, titulo),
     el("p", { class: "ficha-nombre" }, c.nombre, " ", etiquetaElemento(c.elemento), c.estado ? el("span", { class: `estado estado-${c.estado}` }, ESTADO[c.estado]) : null),
     barraPs(c)
@@ -95,6 +98,7 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion) {
         "aria-pressed": marcada ? "true" : "false",
         onclick: () => acciones.alternarSeleccion(c.id),
       },
+      retrato(c.id, { elemento: c.elemento, fondo: true, titulo: c.nombre, clase: "retrato retrato-tarjeta" }),
       el("span", { class: "ficha-nombre" }, c.nombre, " ", etiquetaElemento(c.elemento)),
       el("span", { class: "stats" }, `PS ${c.ps} · Atq ${c.ataque} · Def ${c.defensa} · Vel ${c.velocidad}`),
       el("span", { class: "suave descripcion" }, c.descripcion),
@@ -122,7 +126,7 @@ function pantallaCombate(vista, acciones) {
   const campo = el(
     "div",
     { class: "campo-batalla" },
-    vista.rival.activa ? fichaCriatura(vista.rival.activa, `Rival · le quedan ${vista.rival.restantes}`) : null,
+    vista.rival.activa ? fichaCriatura(vista.rival.activa, `Rival · le quedan ${vista.rival.restantes}`, { espejo: true }) : null,
     fichaCriatura(mia, "Tu criatura")
   );
 
@@ -233,9 +237,9 @@ function textoEventoEspectador(ev) {
 }
 
 export function dibujarEspectador(vista, { salir }) {
-  const fichas = vista.jugadores.map((j) =>
+  const fichas = vista.jugadores.map((j, i) =>
     j.activa
-      ? fichaCriatura(j.activa, `${j.nombre} · le quedan ${j.restantes}${vista.fase === "combate" && j.eleccionHecha ? " · ya ha elegido" : ""}`)
+      ? fichaCriatura(j.activa, `${j.nombre} · le quedan ${j.restantes}${vista.fase === "combate" && j.eleccionHecha ? " · ya ha elegido" : ""}`, { espejo: i === 1 })
       : el("div", { class: "ficha" }, el("p", { class: "ficha-titulo" }, j.nombre), el("p", { class: "suave" }, j.eleccionHecha ? "Equipo elegido" : "Eligiendo equipo…"))
   );
   const estado =
