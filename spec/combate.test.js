@@ -5,7 +5,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { Combate, calcularDanio } = require("../servidor/juego/combate.js");
+const { Combate, calcularDanio, PROB_CRITICO } = require("../servidor/juego/combate.js");
 
 const ANA = "ana@test.es";
 const LUIS = "luis@test.es";
@@ -141,8 +141,8 @@ test("un ataque puede fallar según su precisión", () => {
 });
 
 test("quemado: el ataque puede quemar y la quemadura quita 1/10 de los PS al final del turno", () => {
-  // desempate, precisión, variación y 0,1 < 30 % de Ascuas: Marejón queda quemado.
-  const c = combate(["pirolince", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.1));
+  // desempate, precisión, variación, crítico (no) y 0,1 < 30 % de Ascuas: Marejón queda quemado.
+  const c = combate(["pirolince", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.5, 0.1));
   c.elegirAccion(ANA, atacar("ascuas"));
   c.elegirAccion(LUIS, atacar("embestida"));
   const v = c.vista(LUIS);
@@ -153,7 +153,7 @@ test("quemado: el ataque puede quemar y la quemadura quita 1/10 de los PS al fin
 
 test("congelado: la criatura no actúa hasta que se descongela", () => {
   // Nautilia (80) congela a Marejón (40) con 0,1 < 20 %; después 0,5 >= 30 %: sigue congelado.
-  const c = combate(["nautilia", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.1));
+  const c = combate(["nautilia", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.5, 0.1));
   c.elegirAccion(ANA, atacar("burbuja-helada"));
   c.elegirAccion(LUIS, atacar("embestida"));
   const noActua = c.vista(LUIS).eventos.find((e) => e.tipo === "no-actua");
@@ -161,9 +161,9 @@ test("congelado: la criatura no actúa hasta que se descongela", () => {
 });
 
 test("congelado: con suerte se descongela y ataca en el mismo turno", () => {
-  // Turno 1: se congela (y no se descongela con 0,5). Turno 2: desempate, precisión y variación
-  // de Nautilia, y 0,1 < 30 %: Marejón se descongela.
-  const c = combate(["nautilia", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.1, 0.5, 0.5, 0.5, 0.5, 0.1));
+  // Turno 1: se congela (y no se descongela con 0,5). Turno 2: desempate, precisión, variación
+  // y crítico de Nautilia, y 0,1 < 30 %: Marejón se descongela.
+  const c = combate(["nautilia", "brason", "voltarda"], ["marejon", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.5, 0.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.1));
   c.elegirAccion(ANA, atacar("burbuja-helada"));
   c.elegirAccion(LUIS, atacar("embestida"));
   c.elegirAccion(ANA, atacar("embestida"));
@@ -175,7 +175,8 @@ test("congelado: con suerte se descongela y ataca en el mismo turno", () => {
 test("paralizado: reduce la velocidad a la mitad y a veces impide actuar", () => {
   // Turno 1: Plumazul (55) ataca antes que Chispardo (50), que usa Chispa y lo paraliza (0,1 < 30 %).
   // Turno 2: Plumazul (55 -> 27) ya es más lento que Chispardo, y 0,1 < 25 %: no actúa.
-  const c = combate(["chispardo", "brason", "marejon"], ["plumazul", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.5, 0.5, 0.1, 0.5, 0.5, 0.5, 0.1));
+  // Cada ataque que acierta gasta precisión, variación y crítico.
+  const c = combate(["chispardo", "brason", "marejon"], ["plumazul", "musgolem", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.1, 0.5, 0.5, 0.5, 0.5, 0.1));
   c.elegirAccion(ANA, atacar("chispa"));
   c.elegirAccion(LUIS, atacar("embestida"));
   assert.equal(c.vista(LUIS).yo.equipo[0].estado, "paralizado");
@@ -398,4 +399,27 @@ test("RF-29: los cambios obligados y el abandono también quedan en la crónica"
   const tipos = cronica.flatMap((t) => t.eventos.map((e) => e.tipo));
   assert.equal(tipos[tipos.length - 1], "fin");
   assert.ok(cronica.length >= 3);
+});
+
+// ---------- RF-30: golpes críticos ----------
+
+test("RF-30: un golpe crítico hace un 50 % más de daño", () => {
+  assert.equal(calcularDanio({ potencia: 90, ataque: 80, defensa: 70, mismoElemento: false, eficacia: 1, variacion: 1, critico: true }), 54);
+  assert.equal(calcularDanio({ potencia: 90, ataque: 80, defensa: 70, mismoElemento: false, eficacia: 1, variacion: 1 }), 36);
+  assert.equal(PROB_CRITICO, 1 / 16);
+});
+
+test("RF-30: con suerte el ataque es crítico y el evento lo dice", () => {
+  // Pirolince (80) ataca primero: desempate, precisión, variación y 0,01 < 1/16: crítico.
+  const normal = combate(["pirolince", "brason", "voltarda"], ["musgolem", "marejon", "rocadonte"]);
+  normal.elegirAccion(ANA, atacar("embestida"));
+  normal.elegirAccion(LUIS, atacar("embestida"));
+  const golpeNormal = normal.vista(ANA).eventos.find((e) => e.quien === "yo");
+  const critico = combate(["pirolince", "brason", "voltarda"], ["musgolem", "marejon", "rocadonte"], secuencia(0.5, 0.5, 0.5, 0.01));
+  critico.elegirAccion(ANA, atacar("embestida"));
+  critico.elegirAccion(LUIS, atacar("embestida"));
+  const golpe = critico.vista(ANA).eventos.find((e) => e.quien === "yo");
+  assert.equal(golpeNormal.critico, false);
+  assert.equal(golpe.critico, true);
+  assert.ok(golpe.danio > golpeNormal.danio);
 });

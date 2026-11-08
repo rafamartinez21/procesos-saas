@@ -30,7 +30,7 @@ function textoEvento(ev) {
       return `${ev.quien === "yo" ? "Sacas" : "Tu rival saca"} a ${ev.criatura}.`;
     case "ataque": {
       const ef = ev.eficacia === 2 ? " ¡Es muy eficaz!" : ev.eficacia === 0.5 ? " No es muy eficaz…" : "";
-      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} contra ${delOtro(ev.quien, ev.objetivo)}: ${ev.danio} de daño.${ef}`;
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} contra ${delOtro(ev.quien, ev.objetivo)}: ${ev.danio} de daño.${ev.critico ? " ¡Golpe crítico!" : ""}${ef}`;
     }
     case "falla":
       return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento}, pero falla.`;
@@ -362,7 +362,7 @@ function textoEventoEspectador(ev) {
       return `${ev.quien} saca a ${ev.criatura}.`;
     case "ataque": {
       const ef = ev.eficacia === 2 ? " ¡Es muy eficaz!" : ev.eficacia === 0.5 ? " No es muy eficaz…" : "";
-      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} contra ${ev.objetivo}: ${ev.danio} de daño.${ef}`;
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} contra ${ev.objetivo}: ${ev.danio} de daño.${ev.critico ? " ¡Golpe crítico!" : ""}${ef}`;
     }
     case "falla":
       return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento}, pero falla.`;
