@@ -84,3 +84,26 @@ test("dos máquinas juegan 40 partidas completas sin hacer nunca una acción inv
     assert.ok(["sin-criaturas", "empate"].includes(c.motivo));
   }
 });
+
+// ---------- RF-31: movimientos de apoyo ----------
+
+test("RF-31: la máquina se cura con Marea curativa cuando le quedan menos de la mitad de los PS", () => {
+  const c = new Combate(["ia", "humano"], { aleatorio: () => 0.5 });
+  c.elegirEquipo("ia", ["marejon", "brason", "voltarda"]);
+  c.elegirEquipo("humano", ["voltarda", "musgolem", "ciclonia"]);
+  const v = c.vista("ia");
+  v.yo.equipo[0].ps = 30; // la vista es una copia: se simula que está herido
+  assert.deepEqual(elegirAccionIA(v, () => 0.1), { tipo: "atacar", movimiento: "marea-curativa" });
+  v.yo.equipo[0].ps = 100;
+  assert.notEqual(elegirAccionIA(v, () => 0.1).movimiento, "marea-curativa", "sana no se cura");
+});
+
+test("RF-31: la máquina sube su estadística solo mientras no está al máximo", () => {
+  const c = new Combate(["ia", "humano"], { aleatorio: () => 0.5 });
+  c.elegirEquipo("ia", ["chispardo", "brason", "marejon"]);
+  c.elegirEquipo("humano", ["ciclonia", "musgolem", "pirolince"]);
+  const v = c.vista("ia");
+  assert.deepEqual(elegirAccionIA(v, () => 0.1), { tipo: "atacar", movimiento: "concentracion" });
+  v.yo.equipo[0].mods.ataque = 2;
+  assert.notEqual(elegirAccionIA(v, () => 0.1).movimiento, "concentracion");
+});

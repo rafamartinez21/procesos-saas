@@ -40,7 +40,7 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 | ID | Requisito | Estimación | Estado |
 |---|---|---|---|
 | RF-30 | Golpes críticos | 1 h | hecho |
-| RF-31 | Movimientos de apoyo que suben o bajan estadísticas | 5 h | pendiente |
+| RF-31 | Movimientos de apoyo que suben o bajan estadísticas | 5 h | hecho |
 | RF-32 | Tiempo límite por turno: si no se elige, el servidor elige; tres turnos seguidos sin elegir pierden el combate | 5 h | pendiente |
 
 ### Hito 11: encontrar partida

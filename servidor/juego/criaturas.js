@@ -32,6 +32,9 @@ const ESTADOS = ["quemado", "congelado", "paralizado"];
 
 // potencia: daño base; precision: % de acierto; efecto: estado que puede causar (prob 0..1)
 // o drenar: fracción del daño causado que recupera el atacante.
+// apoyo (RF-31): movimiento sin daño (potencia 0) que cambia estadísticas o cura:
+//   { sobre: "propio" | "rival", stat: "ataque" | "defensa" | "velocidad", etapas: ±n }
+//   { cura: fracción de los PS máximos }
 const MOVIMIENTOS = {
   embestida: { nombre: "Embestida", elemento: NEUTRO, potencia: 40, precision: 100 },
   ascuas: { nombre: "Ascuas", elemento: "fuego", potencia: 50, precision: 100, efecto: { estado: "quemado", prob: 0.3 } },
@@ -46,23 +49,37 @@ const MOVIMIENTOS = {
   temblor: { nombre: "Temblor", elemento: "tierra", potencia: 95, precision: 85 },
   ventisca: { nombre: "Ventisca", elemento: "viento", potencia: 60, precision: 90, efecto: { estado: "congelado", prob: 0.2 } },
   vendaval: { nombre: "Vendaval", elemento: "viento", potencia: 85, precision: 90 },
+  // Movimientos de apoyo (RF-31).
+  concentracion: { nombre: "Concentración", elemento: NEUTRO, potencia: 0, precision: 100, apoyo: { sobre: "propio", stat: "ataque", etapas: 2 } },
+  "escudo-de-roca": { nombre: "Escudo de roca", elemento: "tierra", potencia: 0, precision: 100, apoyo: { sobre: "propio", stat: "defensa", etapas: 2 } },
+  "viento-de-cola": { nombre: "Viento de cola", elemento: "viento", potencia: 0, precision: 100, apoyo: { sobre: "propio", stat: "velocidad", etapas: 2 } },
+  rugido: { nombre: "Rugido", elemento: NEUTRO, potencia: 0, precision: 100, apoyo: { sobre: "rival", stat: "ataque", etapas: -1 } },
+  esporas: { nombre: "Nube de esporas", elemento: "planta", potencia: 0, precision: 90, apoyo: { sobre: "rival", stat: "velocidad", etapas: -1 } },
+  "marea-curativa": { nombre: "Marea curativa", elemento: "agua", potencia: 0, precision: 100, apoyo: { cura: 0.4 } },
 };
+
+// Etapas de una estadística (RF-31): de -2 a +2. Cada etapa positiva suma la mitad del valor
+// base (+1 = x1,5; +2 = x2) y cada negativa lo divide igual (-1 = x0,67; -2 = x0,5).
+const ETAPA_MAXIMA = 2;
+function multiplicadorEtapa(etapa) {
+  return etapa >= 0 ? (2 + etapa) / 2 : 2 / (2 - etapa);
+}
 
 // Doce criaturas, dos por elemento: una rápida y frágil y otra lenta y resistente.
 // Estadísticas: ps (puntos de salud), ataque, defensa, velocidad. Todas suman 280.
 const CATALOGO = [
   { id: "pirolince", nombre: "Pirolince", elemento: "fuego", ps: 70, ataque: 80, defensa: 50, velocidad: 80, movimientos: ["llamarada", "ascuas", "embestida", "vendaval"], descripcion: "Felino veloz cuya melena arde cuando caza." },
-  { id: "brason", nombre: "Brasón", elemento: "fuego", ps: 95, ataque: 70, defensa: 75, velocidad: 40, movimientos: ["llamarada", "ascuas", "pedrada", "embestida"], descripcion: "Tortuga de lava que dormita en los volcanes." },
-  { id: "marejon", nombre: "Marejón", elemento: "agua", ps: 100, ataque: 70, defensa: 70, velocidad: 40, movimientos: ["torrente", "burbuja-helada", "temblor", "embestida"], descripcion: "Morsa colosal que provoca mareas al rugir." },
+  { id: "brason", nombre: "Brasón", elemento: "fuego", ps: 95, ataque: 70, defensa: 75, velocidad: 40, movimientos: ["llamarada", "escudo-de-roca", "pedrada", "embestida"], descripcion: "Tortuga de lava que dormita en los volcanes." },
+  { id: "marejon", nombre: "Marejón", elemento: "agua", ps: 100, ataque: 70, defensa: 70, velocidad: 40, movimientos: ["torrente", "marea-curativa", "temblor", "embestida"], descripcion: "Morsa colosal que provoca mareas al rugir." },
   { id: "nautilia", nombre: "Nautilia", elemento: "agua", ps: 70, ataque: 75, defensa: 55, velocidad: 80, movimientos: ["torrente", "burbuja-helada", "ventisca", "embestida"], descripcion: "Caracola danzante de los arrecifes de cristal." },
-  { id: "musgolem", nombre: "Musgolem", elemento: "planta", ps: 100, ataque: 65, defensa: 80, velocidad: 35, movimientos: ["drenaje", "latigo-cepa", "pedrada", "embestida"], descripcion: "Gigante de piedra cubierto de musgo milenario." },
+  { id: "musgolem", nombre: "Musgolem", elemento: "planta", ps: 100, ataque: 65, defensa: 80, velocidad: 35, movimientos: ["drenaje", "esporas", "pedrada", "embestida"], descripcion: "Gigante de piedra cubierto de musgo milenario." },
   { id: "espinara", nombre: "Espinara", elemento: "planta", ps: 70, ataque: 80, defensa: 50, velocidad: 80, movimientos: ["drenaje", "latigo-cepa", "chispa", "embestida"], descripcion: "Zorra de zarzas que se camufla en los bosques." },
   { id: "voltarda", nombre: "Voltarda", elemento: "rayo", ps: 65, ataque: 85, defensa: 45, velocidad: 85, movimientos: ["descarga", "chispa", "vendaval", "embestida"], descripcion: "Avutarda que planea entre nubes de tormenta." },
-  { id: "chispardo", nombre: "Chispardo", elemento: "rayo", ps: 90, ataque: 70, defensa: 70, velocidad: 50, movimientos: ["descarga", "chispa", "torrente", "embestida"], descripcion: "Lagarto acorazado que almacena relámpagos." },
-  { id: "rocadonte", nombre: "Rocadonte", elemento: "tierra", ps: 100, ataque: 80, defensa: 70, velocidad: 30, movimientos: ["temblor", "pedrada", "ascuas", "embestida"], descripcion: "Mastodonte de roca cuyos pasos abren grietas." },
+  { id: "chispardo", nombre: "Chispardo", elemento: "rayo", ps: 90, ataque: 70, defensa: 70, velocidad: 50, movimientos: ["descarga", "chispa", "concentracion", "embestida"], descripcion: "Lagarto acorazado que almacena relámpagos." },
+  { id: "rocadonte", nombre: "Rocadonte", elemento: "tierra", ps: 100, ataque: 80, defensa: 70, velocidad: 30, movimientos: ["temblor", "rugido", "ascuas", "embestida"], descripcion: "Mastodonte de roca cuyos pasos abren grietas." },
   { id: "terrabu", nombre: "Terrabú", elemento: "tierra", ps: 75, ataque: 75, defensa: 60, velocidad: 70, movimientos: ["temblor", "pedrada", "latigo-cepa", "embestida"], descripcion: "Topo excavador que oye a sus presas bajo tierra." },
   { id: "ciclonia", nombre: "Ciclonia", elemento: "viento", ps: 65, ataque: 80, defensa: 45, velocidad: 90, movimientos: ["vendaval", "ventisca", "descarga", "embestida"], descripcion: "Mantis que corta el aire con alas de cristal." },
-  { id: "plumazul", nombre: "Plumazul", elemento: "viento", ps: 90, ataque: 65, defensa: 70, velocidad: 55, movimientos: ["vendaval", "ventisca", "drenaje", "embestida"], descripcion: "Gran ave azul que guía a los viajeros perdidos." },
+  { id: "plumazul", nombre: "Plumazul", elemento: "viento", ps: 90, ataque: 65, defensa: 70, velocidad: 55, movimientos: ["vendaval", "viento-de-cola", "drenaje", "embestida"], descripcion: "Gran ave azul que guía a los viajeros perdidos." },
 ];
 
 const POR_ID = new Map(CATALOGO.map((c) => [c.id, c]));
@@ -89,6 +106,8 @@ module.exports = {
   FUERTE_CONTRA,
   ESTADOS,
   MOVIMIENTOS,
+  ETAPA_MAXIMA,
+  multiplicadorEtapa,
   CATALOGO,
   eficacia,
   obtenerCriatura,

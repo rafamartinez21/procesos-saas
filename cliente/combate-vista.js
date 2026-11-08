@@ -18,6 +18,14 @@ const ELEMENTO = {
 };
 
 const ESTADO = { quemado: "Quemado", congelado: "Congelado", paralizado: "Paralizado" };
+const STAT = { ataque: "ataque", defensa: "defensa", velocidad: "velocidad" };
+
+// RF-31: frase de un cambio de etapa. "quien" ya viene como texto ("Tu Chispardo", "Ana"…).
+function textoModifica(ev, de, afectada) {
+  if (ev.cambio === 0) return `${de} usa ${ev.movimiento}, pero ${STAT[ev.stat] === "defensa" ? "la" : "el"} ${STAT[ev.stat]} de ${afectada} no puede ${ev.sobre === "propio" ? "subir" : "bajar"} más.`;
+  const verbo = ev.cambio > 0 ? (ev.cambio > 1 ? "sube mucho" : "sube") : ev.cambio < -1 ? "baja mucho" : "baja";
+  return `${de} usa ${ev.movimiento}: ${STAT[ev.stat] === "defensa" ? "la" : "el"} ${STAT[ev.stat]} de ${afectada} ${verbo}.`;
+}
 
 const etiquetaElemento = (e) => el("span", { class: `elemento elem-${e}` }, iconoElemento(e), ELEMENTO[e] || e);
 
@@ -44,6 +52,10 @@ function textoEvento(ev) {
       return `${de(ev.quien, ev.criatura)} sufre ${ev.danio} de daño por la quemadura.`;
     case "drena":
       return `${de(ev.quien, ev.criatura)} recupera ${ev.cura} PS.`;
+    case "cura":
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} y recupera ${ev.cura} PS.`;
+    case "modifica":
+      return textoModifica(ev, de(ev.quien, ev.criatura), ev.sobre === "propio" ? (ev.quien === "yo" ? `tu ${ev.objetivo}` : `${ev.objetivo} (rival)`) : delOtro(ev.quien, ev.objetivo));
     case "debilitada":
       return `${de(ev.quien, ev.criatura)} se ha debilitado.`;
     case "fin":
@@ -206,6 +218,14 @@ function banquillo(vista, acciones, { titulo = "Cambiar a" } = {}) {
   );
 }
 
+// Detalle de un movimiento: daño o, si es de apoyo (RF-31), lo que hace.
+function detalleMovimiento(m) {
+  if (!m.apoyo) return `${ELEMENTO[m.elemento]} · Pot ${m.potencia} · Prec ${m.precision}%`;
+  if (m.apoyo.cura) return `Apoyo · Cura ${Math.round(m.apoyo.cura * 100)} % de PS`;
+  const signo = m.apoyo.etapas > 0 ? "+" : "";
+  return `Apoyo · ${m.apoyo.sobre === "propio" ? "Tu" : "Rival"} ${STAT[m.apoyo.stat]} ${signo}${m.apoyo.etapas}${m.precision < 100 ? ` · Prec ${m.precision}%` : ""}`;
+}
+
 function botonesMovimientos(vista, acciones) {
   const mia = vista.yo.equipo[vista.yo.activa];
   const eficacias = vista.yo.eficacias || {};
@@ -218,7 +238,7 @@ function botonesMovimientos(vista, acciones) {
         "button",
         { type: "button", class: `mov elem-fondo-${m.elemento}`, onclick: () => acciones.atacar(m.id) },
         el("span", { class: "mov-nombre" }, iconoElemento(m.elemento), m.nombre),
-        el("span", { class: "mov-detalle" }, `${ELEMENTO[m.elemento]} · Pot ${m.potencia} · Prec ${m.precision}%`),
+        el("span", { class: "mov-detalle" }, detalleMovimiento(m)),
         aviso ? el("span", { class: `mov-eficacia ${clase}` }, aviso) : null
       );
     })
@@ -376,6 +396,10 @@ function textoEventoEspectador(ev) {
       return `${de(ev.quien, ev.criatura)} sufre ${ev.danio} de daño por la quemadura.`;
     case "drena":
       return `${de(ev.quien, ev.criatura)} recupera ${ev.cura} PS.`;
+    case "cura":
+      return `${de(ev.quien, ev.criatura)} usa ${ev.movimiento} y recupera ${ev.cura} PS.`;
+    case "modifica":
+      return textoModifica(ev, de(ev.quien, ev.criatura), ev.objetivo);
     case "debilitada":
       return `${de(ev.quien, ev.criatura)} se ha debilitado.`;
     case "fin":

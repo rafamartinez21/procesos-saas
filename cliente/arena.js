@@ -13,6 +13,8 @@ import { retrato, iconoElemento } from "./retratos.js";
 
 const ELEMENTO = { fuego: "Fuego", agua: "Agua", planta: "Planta", rayo: "Rayo", tierra: "Tierra", viento: "Viento", neutro: "Neutro" };
 const ESTADO = { quemado: "Quemado", congelado: "Congelado", paralizado: "Paralizado" };
+const STAT_CORTO = { ataque: "Atq", defensa: "Def", velocidad: "Vel" };
+const STAT_LARGO = { ataque: "Ataque", defensa: "Defensa", velocidad: "Velocidad" };
 
 const sinMovimiento = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const esperar = (ms) => new Promise((r) => setTimeout(r, sinMovimiento() ? 0 : ms));
@@ -32,13 +34,14 @@ function crearLado(posicion) {
   const texto = el("span", { class: "ps-texto" });
   const barra = el("div", { class: "ps", role: "meter", "aria-valuemin": "0" }, relleno, texto);
   const pips = el("span", { class: "pips", "aria-hidden": "true" });
+  const mods = el("span", { class: "mods" });
   const dueno = el("span", { class: "hud-dueno" });
-  const hud = el("div", { class: "hud" }, el("div", { class: "hud-fila" }, nombre, etiquetas), barra, el("div", { class: "hud-fila hud-pie" }, dueno, pips));
+  const hud = el("div", { class: "hud" }, el("div", { class: "hud-fila" }, nombre, etiquetas), barra, el("div", { class: "hud-fila hud-pie" }, dueno, mods, pips));
   const cuerpo = el("div", { class: "cuerpo" });
   const destello = el("div", { class: "destello" });
   const sprite = el("div", { class: "sprite" }, el("div", { class: "plataforma" }), cuerpo, destello);
   const nodo = el("div", { class: `lado lado-${posicion}` }, hud, sprite);
-  return { posicion, nodo, hud, nombre, etiquetas, relleno, texto, barra, pips, dueno, cuerpo, destello, sprite, criatura: null, psMostrado: 0 };
+  return { posicion, nodo, hud, nombre, etiquetas, relleno, texto, barra, pips, mods, dueno, cuerpo, destello, sprite, criatura: null, psMostrado: 0 };
 }
 
 export function crearArena() {
@@ -68,6 +71,11 @@ export function crearArena() {
     const hijos = [el("span", { class: `elemento elem-${c.elemento}` }, iconoElemento(c.elemento), ELEMENTO[c.elemento] || c.elemento)];
     if (c.estado) hijos.push(el("span", { class: `estado estado-${c.estado}` }, ESTADO[c.estado]));
     l.etiquetas.replaceChildren(...hijos);
+    // Etapas de estadísticas (RF-31): una flecha por etapa.
+    const mods = Object.entries(c.mods || {}).filter(([, n]) => n);
+    l.mods.replaceChildren(
+      ...mods.map(([stat, n]) => el("span", { class: `mod ${n > 0 ? "sube" : "baja"}`, title: `${STAT_LARGO[stat]} ${n > 0 ? "+" : ""}${n}` }, `${STAT_CORTO[stat]} ${n > 0 ? "▲".repeat(n) : "▼".repeat(-n)}`))
+    );
   }
 
   // Coloca una criatura en un lado sin animación.
@@ -202,7 +210,7 @@ export function crearArena() {
       switch (ev.tipo) {
         case "cambio":
           await salir(l);
-          colocar(l, { id: ev.id, nombre: ev.criatura, elemento: ev.elemento, ps: ev.ps, psMax: ev.psMax, estado: ev.estado || null }, { dueno: duenoDe(l) });
+          colocar(l, { id: ev.id, nombre: ev.criatura, elemento: ev.elemento, ps: ev.ps, psMax: ev.psMax, estado: ev.estado || null, mods: ev.mods }, { dueno: duenoDe(l) });
           await entrar(l);
           break;
         case "ataque": {
@@ -239,6 +247,24 @@ export function crearArena() {
           flotante(l, `+${ev.cura}`, "cura");
           await Promise.all([aura(l, "planta"), animarPs(l, ev.ps)]);
           break;
+        case "cura":
+          await embestir(l, { corto: true });
+          flotante(l, `+${ev.cura}`, "cura");
+          await Promise.all([aura(l, "agua"), animarPs(l, ev.ps)]);
+          break;
+        case "modifica": {
+          const afectado = ev.sobre === "propio" ? l : otro(l);
+          await embestir(l, { corto: true });
+          const c = lados[afectado].criatura;
+          if (c) {
+            c.mods = { ...(c.mods || {}), [ev.stat]: ev.nivel };
+            pintarEtiquetas(lados[afectado]);
+          }
+          const flecha = ev.cambio > 0 ? "▲".repeat(ev.cambio) : ev.cambio < 0 ? "▼".repeat(-ev.cambio) : "=";
+          flotante(afectado, `${STAT_LARGO[ev.stat]} ${flecha}`, ev.cambio > 0 ? "sube" : ev.cambio < 0 ? "baja" : "falla");
+          await aura(afectado, ev.cambio >= 0 ? "rayo" : "agua");
+          break;
+        }
         case "debilitada":
           await animarPs(l, 0);
           await caer(l);

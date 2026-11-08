@@ -8,6 +8,7 @@ const { TAMANO_EQUIPO } = require("./combate.js");
 
 // Lo bueno que es un movimiento contra una criatura de un elemento: daño esperado relativo.
 function valorMovimiento(mov, elementoPropio, elementoRival) {
+  if (mov.apoyo) return 0; // sin daño: se decide aparte (apoyoUtil)
   const mismo = mov.elemento === elementoPropio ? 1.25 : 1;
   return mov.potencia * mismo * eficacia(mov.elemento, elementoRival) * (mov.precision / 100);
 }
@@ -47,6 +48,27 @@ function mejorCambio(yo, elementoRival) {
   return mejor;
 }
 
+// Movimiento de apoyo que merece la pena ahora, o null (RF-31):
+//  - curarse si le quedan menos de la mitad de los PS;
+//  - subir una estadística propia mientras está sana y no ha llegado al máximo;
+//  - bajar la del rival si aún no está bajada.
+// Solo consulta el azar si la criatura tiene algún movimiento de apoyo.
+function apoyoUtil(activa, rival, aleatorio) {
+  const apoyos = activa.movimientos.filter((m) => m.apoyo);
+  if (!apoyos.length) return null;
+  const vida = activa.ps / activa.psMax;
+  const mods = activa.mods || {};
+  const modsRival = (rival && rival.mods) || {};
+  const tirada = aleatorio();
+  for (const m of apoyos) {
+    const a = m.apoyo;
+    if (a.cura && vida < 0.5 && tirada < 0.7) return m;
+    if (a.sobre === "propio" && vida > 0.6 && (mods[a.stat] || 0) < 2 && tirada < 0.3) return m;
+    if (a.sobre === "rival" && (modsRival[a.stat] || 0) > -1 && tirada < 0.2) return m;
+  }
+  return null;
+}
+
 // Acción de combate a partir de la vista. Devuelve null si ahora no le toca actuar.
 function elegirAccionIA(vista, aleatorio = Math.random) {
   if (vista.fase !== "combate") return null;
@@ -67,9 +89,13 @@ function elegirAccionIA(vista, aleatorio = Math.random) {
     return { tipo: "cambiar", indice: cambio.indice };
   }
 
+  // RF-31: a veces usa un movimiento de apoyo cuando le sirve.
+  const apoyo = apoyoUtil(activa, rival.activa, aleatorio);
+  if (apoyo) return { tipo: "atacar", movimiento: apoyo.id };
+
   // Casi siempre el mejor movimiento; a veces, otro que no sea inútil.
   if (aleatorio() < 0.15) {
-    const otros = activa.movimientos.filter((m) => m.id !== propio.mov.id && eficacia(m.elemento, elementoRival) >= 1);
+    const otros = activa.movimientos.filter((m) => m.id !== propio.mov.id && !m.apoyo && eficacia(m.elemento, elementoRival) >= 1);
     if (otros.length) return { tipo: "atacar", movimiento: otros[Math.floor(aleatorio() * otros.length)].id };
   }
   return { tipo: "atacar", movimiento: propio.mov.id };

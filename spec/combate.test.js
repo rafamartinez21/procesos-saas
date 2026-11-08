@@ -265,7 +265,8 @@ test("la vista nunca revela la acción elegida ni el banquillo del rival", () =>
   c.elegirAccion(ANA, atacar("vendaval"));
   const v = c.vista(LUIS);
   assert.deepEqual(Object.keys(v.rival).sort(), ["activa", "debeCambiar", "eleccionHecha", "equipoElegido", "restantes"]);
-  assert.deepEqual(Object.keys(v.rival.activa).sort(), ["elemento", "estado", "id", "nombre", "ps", "psMax"]);
+  // mods: las etapas de estadísticas (RF-31) son públicas, como el estado.
+  assert.deepEqual(Object.keys(v.rival.activa).sort(), ["elemento", "estado", "id", "mods", "nombre", "ps", "psMax"]);
   assert.equal(JSON.stringify(v).includes("pirolince"), false);
   assert.equal(JSON.stringify(v).includes("@"), false);
 });
@@ -422,4 +423,74 @@ test("RF-30: con suerte el ataque es crítico y el evento lo dice", () => {
   assert.equal(golpeNormal.critico, false);
   assert.equal(golpe.critico, true);
   assert.ok(golpe.danio > golpeNormal.danio);
+});
+
+// ---------- RF-31: movimientos de apoyo y etapas ----------
+
+test("RF-31: Concentración sube dos etapas el ataque propio y el siguiente golpe hace el doble", () => {
+  // Chispardo: Concentración y luego Embestida contra Musgolem (que no hace nada útil: Nube de esporas falla poco).
+  const sin = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
+  sin.elegirAccion(ANA, atacar("embestida"));
+  sin.elegirAccion(LUIS, atacar("esporas"));
+  const golpeSin = sin.vista(ANA).eventos.find((e) => e.tipo === "ataque" && e.quien === "yo").danio;
+
+  const con = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
+  con.elegirAccion(ANA, atacar("concentracion"));
+  con.elegirAccion(LUIS, atacar("esporas"));
+  const mod = con.vista(ANA).eventos.find((e) => e.tipo === "modifica" && e.quien === "yo");
+  assert.deepEqual([mod.sobre, mod.stat, mod.cambio, mod.nivel], ["propio", "ataque", 2, 2]);
+  assert.equal(con.vista(LUIS).rival.activa.mods.ataque, 2, "el rival ve la etapa");
+  con.elegirAccion(ANA, atacar("embestida"));
+  con.elegirAccion(LUIS, atacar("esporas"));
+  const golpeCon = con.vista(ANA).eventos.find((e) => e.tipo === "ataque" && e.quien === "yo").danio;
+  assert.ok(golpeCon >= golpeSin * 2 - 2 && golpeCon <= golpeSin * 2 + 2, `${golpeCon} frente a ${golpeSin}`);
+});
+
+test("RF-31: las etapas no pasan de +2 y el evento dice que ya no puede subir más", () => {
+  const c = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
+  for (let i = 0; i < 2; i++) {
+    c.elegirAccion(ANA, atacar("concentracion"));
+    c.elegirAccion(LUIS, atacar("esporas"));
+  }
+  const mod = c.vista(ANA).eventos.find((e) => e.tipo === "modifica" && e.quien === "yo");
+  assert.deepEqual([mod.cambio, mod.nivel], [0, 2]);
+});
+
+test("RF-31: Nube de esporas baja la velocidad del rival y cambia quién ataca primero", () => {
+  // Musgolem (35) contra Terrabú (70): con -1, Terrabú baja a 46; con otra más, a 35.
+  const c = combate(["musgolem", "brason", "marejon"], ["terrabu", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("esporas"));
+  c.elegirAccion(LUIS, atacar("pedrada"));
+  assert.equal(c.vista(ANA).rival.activa.mods.velocidad, -1);
+  const mod = c.vista(LUIS).eventos.find((e) => e.tipo === "modifica");
+  assert.deepEqual([mod.quien, mod.sobre, mod.stat, mod.cambio], ["rival", "rival", "velocidad", -1]);
+});
+
+test("RF-31: Marea curativa cura el 40 % de los PS máximos sin pasar del máximo", () => {
+  const c = combate(["marejon", "brason", "musgolem"], ["voltarda", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("marea-curativa"));
+  c.elegirAccion(LUIS, atacar("descarga"));
+  const v = c.vista(ANA);
+  const cura = v.eventos.find((e) => e.tipo === "cura");
+  // Voltarda (85) ataca antes que Marejón (40): primero recibe y luego se cura.
+  assert.equal(cura.ps, v.yo.equipo[0].ps);
+  assert.ok(cura.cura > 0 && cura.cura <= 40);
+  assert.ok(v.yo.equipo[0].ps <= 100);
+});
+
+test("RF-31: al salir del combate la criatura pierde sus etapas", () => {
+  const c = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
+  c.elegirAccion(ANA, atacar("concentracion"));
+  c.elegirAccion(LUIS, atacar("esporas"));
+  c.elegirAccion(ANA, cambiar(1));
+  c.elegirAccion(LUIS, atacar("esporas"));
+  c.elegirAccion(ANA, cambiar(0));
+  c.elegirAccion(LUIS, atacar("esporas"));
+  assert.equal(c.vista(ANA).yo.equipo[0].mods.ataque, 0);
+});
+
+test("RF-31: los movimientos de apoyo no tienen eficacia en la vista", () => {
+  const c = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
+  assert.equal("concentracion" in c.vista(ANA).yo.eficacias, false);
+  assert.equal(c.vista(ANA).yo.eficacias.descarga, 0.5);
 });

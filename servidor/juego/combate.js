@@ -12,7 +12,7 @@
 //  3. terminada: gana quien deja al rival sin criaturas, o quien se queda si el otro abandona (RF-18).
 
 const { ErrorNegocio } = require("../modelo.js");
-const { obtenerCriatura, obtenerMovimiento, eficacia } = require("./criaturas.js");
+const { obtenerCriatura, obtenerMovimiento, eficacia, ETAPA_MAXIMA, multiplicadorEtapa } = require("./criaturas.js");
 
 const TAMANO_EQUIPO = 3;
 const BONO_MISMO_ELEMENTO = 1.25; // un movimiento del elemento de la criatura pega más
@@ -33,6 +33,8 @@ function calcularDanio({ potencia, ataque, defensa, mismoElemento, eficacia: ef,
   return Math.max(1, Math.floor(base * (mismoElemento ? BONO_MISMO_ELEMENTO : 1) * ef * variacion * (critico ? MULTIPLICADOR_CRITICO : 1)));
 }
 
+const sinMods = () => ({ ataque: 0, defensa: 0, velocidad: 0 });
+
 function nuevaInstancia(datos) {
   return {
     id: datos.id,
@@ -45,6 +47,7 @@ function nuevaInstancia(datos) {
     velocidad: datos.velocidad,
     movimientos: [...datos.movimientos],
     estado: null,
+    mods: sinMods(), // etapas de ataque, defensa y velocidad (RF-31)
   };
 }
 
@@ -81,8 +84,13 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     if (this.fase !== fase) throw new ErrorNegocio("FASE_INCORRECTA", TEXTO_FASE[this.fase]);
   };
   const activa = (j) => j.equipo[j.activa];
+  // Cambia la criatura en combate; la que sale pierde sus etapas (RF-31).
+  const sacar = (j, indice) => {
+    activa(j).mods = sinMods();
+    j.activa = indice;
+  };
   // Evento de cambio con lo que el cliente necesita para dibujar a la criatura que entra (RF-28).
-  const eventoCambio = (email, c) => ({ tipo: "cambio", quien: email, criatura: c.nombre, id: c.id, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado });
+  const eventoCambio = (email, c) => ({ tipo: "cambio", quien: email, criatura: c.nombre, id: c.id, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
   const vivas = (j) => j.equipo.filter((c) => c.ps > 0).length;
 
   // ---------- RF-16: elegir equipo ----------
@@ -118,7 +126,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       if (!j.debeCambiar) throw new ErrorNegocio("ESPERA_RIVAL", "Espera a que tu rival saque otra criatura");
       if (tipo !== "cambiar") throw new ErrorNegocio("ACCION_INVALIDA", "Tu criatura ha caído: elige otra");
       validarCambio(j, accion.indice);
-      j.activa = accion.indice;
+      sacar(j, accion.indice);
       j.debeCambiar = false;
       this.eventos = [eventoCambio(email, activa(j))];
       anotar(this.turno, this.eventos);
@@ -153,7 +161,10 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     if (j.equipo[indice].ps <= 0) throw new ErrorNegocio("CAMBIO_INVALIDO", "Esa criatura está debilitada");
   }
 
-  const velocidadEfectiva = (c) => (c.estado === "paralizado" ? Math.floor(c.velocidad / 2) : c.velocidad);
+  const velocidadEfectiva = (c) => {
+    const v = c.velocidad * multiplicadorEtapa(c.mods.velocidad);
+    return Math.floor(c.estado === "paralizado" ? v / 2 : v);
+  };
 
   // Marca el final si alguien se ha quedado sin criaturas. Si los dos a la vez, empate.
   const comprobarFin = (eventos) => {
@@ -179,7 +190,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     for (const e of emails) {
       const j = jugadores.get(e);
       if (j.accion.tipo === "cambiar") {
-        j.activa = j.accion.indice;
+        sacar(j, j.accion.indice);
         eventos.push(eventoCambio(e, activa(j)));
       }
     }
@@ -220,6 +231,33 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         continue;
       }
 
+      // RF-31: movimientos de apoyo, sin daño.
+      if (mov.apoyo) {
+        if (mov.apoyo.cura) {
+          const cura = Math.min(a.psMax - a.ps, Math.floor(a.psMax * mov.apoyo.cura));
+          a.ps += cura;
+          eventos.push({ tipo: "cura", quien: e, criatura: a.nombre, movimiento: mov.nombre, cura, ps: a.ps });
+        } else {
+          const afectada = mov.apoyo.sobre === "propio" ? a : d;
+          const antes = afectada.mods[mov.apoyo.stat];
+          const despues = Math.max(-ETAPA_MAXIMA, Math.min(ETAPA_MAXIMA, antes + mov.apoyo.etapas));
+          afectada.mods[mov.apoyo.stat] = despues;
+          eventos.push({
+            tipo: "modifica",
+            quien: e,
+            criatura: a.nombre,
+            movimiento: mov.nombre,
+            elemento: mov.elemento,
+            sobre: mov.apoyo.sobre, // "propio": la criatura de quien lo usa; "rival": la otra
+            objetivo: afectada.nombre,
+            stat: mov.apoyo.stat,
+            cambio: despues - antes, // 0 si ya estaba en el límite
+            nivel: despues,
+          });
+        }
+        continue;
+      }
+
       const ef = eficacia(mov.elemento, d.elemento);
       const variacion = 0.85 + aleatorio() * 0.15;
       // RF-30: un golpe crítico hace un 50 % más de daño.
@@ -228,8 +266,8 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         d.ps,
         calcularDanio({
           potencia: mov.potencia,
-          ataque: a.ataque,
-          defensa: d.defensa,
+          ataque: a.ataque * multiplicadorEtapa(a.mods.ataque),
+          defensa: d.defensa * multiplicadorEtapa(d.mods.defensa),
           mismoElemento: mov.elemento === a.elemento,
           eficacia: ef,
           variacion,
@@ -299,7 +337,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       const c = j.equipo && this.fase !== FASE_SELECCION ? activa(j) : null;
       return {
         nombre: nombre(e),
-        activa: c ? { id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado } : null,
+        activa: c ? { id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } } : null,
         restantes: j.equipo ? vivas(j) : null,
         eleccionHecha: this.fase === FASE_SELECCION ? Boolean(j.equipo) : Boolean(j.accion),
       };
@@ -339,7 +377,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       if ("ganador" in copia) copia.ganador = quien(copia.ganador);
       return copia;
     };
-    const criatura = (c) => ({ id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado });
+    const criatura = (c) => ({ id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
     return {
       fase: this.fase,
       turno: this.turno,
@@ -352,7 +390,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
         // la calcula el servidor, el cliente solo la muestra.
         eficacias:
           this.fase === FASE_COMBATE && j.equipo && r.equipo
-            ? Object.fromEntries(activa(j).movimientos.map((m) => [m, eficacia(obtenerMovimiento(m).elemento, activa(r).elemento)]))
+            ? Object.fromEntries(activa(j).movimientos.filter((m) => !obtenerMovimiento(m).apoyo).map((m) => [m, eficacia(obtenerMovimiento(m).elemento, activa(r).elemento)]))
             : null,
         eleccionHecha: Boolean(j.equipo) && (this.fase === FASE_SELECCION || Boolean(j.accion)),
         debeCambiar: j.debeCambiar,
