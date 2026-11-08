@@ -4,7 +4,7 @@
 // los clics a acciones, que se entregan a las funciones de "acciones".
 
 import { el } from "./dom.js";
-import { retrato } from "./retratos.js";
+import { retrato, iconoElemento } from "./retratos.js";
 
 const ELEMENTO = {
   fuego: "Fuego",
@@ -18,7 +18,7 @@ const ELEMENTO = {
 
 const ESTADO = { quemado: "Quemado", congelado: "Congelado", paralizado: "Paralizado" };
 
-const etiquetaElemento = (e) => el("span", { class: `elemento elem-${e}` }, ELEMENTO[e] || e);
+const etiquetaElemento = (e) => el("span", { class: `elemento elem-${e}` }, iconoElemento(e), ELEMENTO[e] || e);
 
 function barraPs(c) {
   const pct = Math.round((100 * c.ps) / c.psMax);
@@ -79,39 +79,107 @@ function textoEvento(ev) {
 
 // ---------- elección de equipo (RF-16) ----------
 
-function pantallaSeleccion(vista, catalogo, acciones, seleccion) {
+const STATS = [
+  ["ps", "PS"],
+  ["ataque", "Atq"],
+  ["defensa", "Def"],
+  ["velocidad", "Vel"],
+];
+
+function barrasStats(c, maximos) {
+  return el(
+    "div",
+    { class: "stats" },
+    ...STATS.map(([clave, texto]) =>
+      el(
+        "div",
+        { class: "stat" },
+        el("span", {}, texto),
+        el("span", { class: "stat-barra" }, el("span", { style: `width:${Math.round((100 * c[clave]) / maximos[clave])}%` })),
+        el("b", {}, String(c[clave]))
+      )
+    )
+  );
+}
+
+function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada }) {
+  return el(
+    "button",
+    {
+      type: "button",
+      class: `carta${orden ? " marcada" : ""}`,
+      "aria-pressed": orden ? "true" : "false",
+      "aria-label": `${c.nombre}, ${ELEMENTO[c.elemento]}${orden ? `, elegida en el puesto ${orden}` : ""}`,
+      disabled: bloqueada && !orden,
+      onclick: alPulsar,
+    },
+    orden ? el("span", { class: "orden", "aria-hidden": "true" }, String(orden)) : null,
+    retrato(c.id, { elemento: c.elemento, fondo: true, titulo: c.nombre, clase: "retrato retrato-carta" }),
+    el("span", { class: "carta-nombre" }, el("strong", {}, c.nombre), etiquetaElemento(c.elemento)),
+    el("p", { class: "descripcion" }, c.descripcion),
+    barrasStats(c, maximos),
+    el("span", { class: "movs-mini" }, ...c.movimientos.map((m) => el("span", { class: `elem-fondo-${m.elemento}` }, m.nombre)))
+  );
+}
+
+function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro) {
+  const porId = new Map(catalogo.map((c) => [c.id, c]));
   if (vista.yo.eleccionHecha) {
     return el(
       "div",
-      { class: "combate" },
-      el("p", { class: "aviso-ok" }, "Equipo elegido: ", vista.yo.equipo.map((c) => c.nombre).join(", "), "."),
-      el("p", { class: "suave" }, vista.rival.equipoElegido ? "Empezando…" : "Esperando a que tu rival elija su equipo…")
+      { class: "combate espera" },
+      el("div", { class: "ranuras", style: "justify-content:center" }, ...vista.yo.equipo.map((c, i) => el("div", { class: "ranura llena", style: "width:96px;height:96px" }, el("span", { class: "num" }, String(i + 1)), retrato(c.id, { elemento: c.elemento, titulo: c.nombre, clase: "retrato", espejo: false })))),
+      el("h2", { style: "margin-top:16px" }, "Equipo listo"),
+      el("p", { class: "suave" }, vista.rival.equipoElegido ? "Abriendo la arena…" : "Esperando a que tu rival elija a sus campeones…")
     );
   }
-  const tarjetas = catalogo.map((c) => {
-    const marcada = seleccion.includes(c.id);
-    return el(
-      "button",
-      {
-        type: "button",
-        class: `tarjeta-criatura elem-borde-${c.elemento}${marcada ? " marcada" : ""}`,
-        "aria-pressed": marcada ? "true" : "false",
-        onclick: () => acciones.alternarSeleccion(c.id),
-      },
-      retrato(c.id, { elemento: c.elemento, fondo: true, titulo: c.nombre, clase: "retrato retrato-tarjeta" }),
-      el("span", { class: "ficha-nombre" }, c.nombre, " ", etiquetaElemento(c.elemento)),
-      el("span", { class: "stats" }, `PS ${c.ps} · Atq ${c.ataque} · Def ${c.defensa} · Vel ${c.velocidad}`),
-      el("span", { class: "suave descripcion" }, c.descripcion),
-      el("span", { class: "movs" }, c.movimientos.map((m) => m.nombre).join(" · "))
-    );
+  const maximos = Object.fromEntries(STATS.map(([k]) => [k, Math.max(...catalogo.map((c) => c[k]))]));
+  const elementos = [...new Set(catalogo.map((c) => c.elemento))];
+  const visibles = filtro ? catalogo.filter((c) => c.elemento === filtro) : catalogo;
+  const lleno = seleccion.length === 3;
+
+  const ranuras = [0, 1, 2].map((i) => {
+    const c = porId.get(seleccion[i]);
+    return c
+      ? el(
+          "button",
+          { type: "button", class: "ranura llena", style: "padding:0;background:none;box-shadow:none", title: `Quitar a ${c.nombre}`, "aria-label": `Quitar a ${c.nombre}`, onclick: () => acciones.alternarSeleccion(c.id) },
+          el("span", { class: "num" }, String(i + 1)),
+          retrato(c.id, { elemento: c.elemento, titulo: c.nombre })
+        )
+      : el("div", { class: "ranura", "aria-hidden": "true" }, String(i + 1));
   });
+
   return el(
     "div",
     { class: "combate" },
-    el("h3", {}, `Elige tu equipo (${seleccion.length}/3)`),
-    el("p", { class: "suave" }, "La primera que elijas sale a combatir. ", vista.rival.equipoElegido ? "Tu rival ya ha elegido." : ""),
-    el("div", { class: "rejilla-criaturas" }, ...tarjetas),
-    el("button", { type: "button", disabled: seleccion.length !== 3, onclick: () => acciones.confirmarEquipo() }, "Confirmar equipo")
+    el(
+      "div",
+      { class: "seleccion-cabecera" },
+      el("div", {}, el("span", { class: "etiqueta-seccion" }, "Antes del duelo"), el("h2", {}, "Elige a tus tres campeones")),
+      el("p", { class: "suave", style: "margin:0" }, vista.rival.equipoElegido ? "Tu rival ya ha elegido." : "Tu rival también está eligiendo.")
+    ),
+    el(
+      "div",
+      { class: "filtros", role: "group", "aria-label": "Filtrar por elemento" },
+      el("button", { type: "button", "aria-pressed": filtro ? "false" : "true", onclick: () => acciones.filtrar(null) }, "Todas"),
+      ...elementos.map((e) => el("button", { type: "button", "aria-pressed": filtro === e ? "true" : "false", onclick: () => acciones.filtrar(e) }, iconoElemento(e), ELEMENTO[e]))
+    ),
+    el(
+      "div",
+      { class: "rejilla-criaturas" },
+      ...visibles.map((c) => {
+        const i = seleccion.indexOf(c.id);
+        return cartaCriatura(c, { orden: i >= 0 ? i + 1 : 0, maximos, bloqueada: lleno, alPulsar: () => acciones.alternarSeleccion(c.id) });
+      })
+    ),
+    el(
+      "div",
+      { class: "bandeja" },
+      el("div", { class: "ranuras" }, ...ranuras),
+      el("span", { class: "texto-bandeja" }, lleno ? "La número 1 sale a combatir." : `Elige ${3 - seleccion.length} más.`),
+      el("button", { type: "button", disabled: !lleno, onclick: () => acciones.confirmarEquipo() }, "¡Al combate!")
+    )
   );
 }
 
@@ -151,7 +219,7 @@ function pantallaCombate(vista, acciones) {
           el(
             "button",
             { type: "button", class: `mov elem-fondo-${m.elemento}`, onclick: () => acciones.atacar(m.id) },
-            el("span", {}, m.nombre),
+            el("span", { class: "mov-nombre" }, iconoElemento(m.elemento), m.nombre),
             el("span", { class: "mov-detalle" }, `${ELEMENTO[m.elemento]} · Pot ${m.potencia} · Prec ${m.precision}%`)
           )
         )
@@ -171,7 +239,7 @@ function resultado(vista, acciones) {
     { class: `resultado resultado-${vista.ganador || "empate"}` },
     el("p", { class: "resultado-titulo" }, texto),
     fin ? el("p", {}, textoEvento(fin)) : null,
-    el("button", { type: "button", onclick: () => acciones.salir() }, "Volver al vestíbulo")
+    el("div", { class: "botones" }, el("button", { type: "button", onclick: () => acciones.salir() }, "Volver al vestíbulo"))
   );
 }
 
@@ -194,8 +262,8 @@ function banquillo(vista, acciones) {
 }
 
 // vista: la del servidor. catalogo: GET /api/criaturas. seleccion: ids marcados (estado local).
-export function dibujarCombate(vista, { catalogo, seleccion, acciones }) {
-  if (vista.fase === "seleccion") return pantallaSeleccion(vista, catalogo, acciones, seleccion);
+export function dibujarCombate(vista, { catalogo, seleccion, filtro = null, acciones }) {
+  if (vista.fase === "seleccion") return pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro);
   // Si alguien abandonó antes de elegir equipos, solo hay resultado.
   if (!vista.yo.equipo) return el("div", { class: "combate" }, resultado(vista, acciones));
   return pantallaCombate(vista, acciones);
