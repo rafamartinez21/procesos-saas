@@ -16,6 +16,8 @@
 //   combate:accion { tipo: "cambiar", indice }        -> RF-17
 //   chat:enviar { texto }                             -> RF-22
 //   partida:observar { id } / partida:dejar-observar  -> RF-23 (espectador)
+//   emparejamiento:buscar / emparejamiento:cancelar   -> RF-33 (duelo rápido por ELO)
+//   partida:revancha                                  -> RF-34
 // Eventos que envía el servidor:
 //   partidas (lista)         -> RF-12, a todos cada vez que cambia
 //   partida:estado (partida) -> a los jugadores de una partida cuando cambia; al conectarse,
@@ -27,6 +29,7 @@
 //   partidas:en-curso (lista)-> a todos, partidas con combate que se pueden mirar (RF-23)
 //   espectador:estado (vista)-> a los espectadores de una partida, en cada cambio
 //   espectador:fin           -> a los espectadores cuando la partida desaparece
+//   emparejamiento:estado    -> al jugador: su búsqueda { elo, esperaMs, margen } o null
 
 const { Server } = require("socket.io");
 const { leerCookie, NOMBRE_COOKIE } = require("./sesiones.js");
@@ -44,7 +47,15 @@ const ESPERA_RECONEXION_MS = 30 * 1000;
 // RF-32: cada cuánto se comprueban los plazos para decidir.
 const INTERVALO_PLAZOS_MS = 1000;
 
-function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro = crearRegistro(), esperaReconexionMs = ESPERA_RECONEXION_MS, intervaloPlazosMs = INTERVALO_PLAZOS_MS }) {
+function conectarTiempoReal(servidorHttp, {
+  sistema,
+  salas,
+  sesiones,
+  registro = crearRegistro(),
+  esperaReconexionMs = ESPERA_RECONEXION_MS,
+  intervaloPlazosMs = INTERVALO_PLAZOS_MS,
+  obtenerElo = async () => 1000, // RF-33: ELO del jugador para emparejar
+}) {
   const io = new Server(servidorHttp, {
     // Mismo origen que la página: no se abre CORS a otros sitios.
     cors: { origin: false },
@@ -99,7 +110,21 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     if (vista) io.to(salaDeEspectadores(id)).emit("espectador:estado", vista);
   };
 
+  // RF-33: dos jugadores emparejados entran en su partida y dejan de buscar.
+  const avisarEmparejados = (partida) => {
+    for (const e of salas.participantesDe(partida.id)) {
+      io.in(salaDeUsuario(e)).socketsJoin(salaDePartida(partida.id));
+      io.to(salaDeUsuario(e)).emit("emparejamiento:estado", null);
+      io.to(salaDeUsuario(e)).emit("partida:estado", partida);
+    }
+    avisarPartida(partida.id);
+    registro.info("jugadores emparejados", { partida: partida.id });
+  };
+
+  const margenAvisado = new Map(); // RF-33: último margen de ELO enviado a cada jugador en cola
+
   // RF-32: si a alguien se le acaba el tiempo, el servidor decide por él y avisa a todos.
+  // RF-33: con la espera crecen los márgenes de ELO de la cola, así que también se empareja.
   const revisarPlazos = setInterval(() => {
     try {
       const cambiadas = salas.vencerPlazos();
@@ -107,7 +132,18 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
         registro.info("plazo vencido", { partida: id });
         avisarPartida(id);
       }
-      if (cambiadas.length) difundirLista();
+      const creadas = salas.emparejarCola();
+      for (const partida of creadas) avisarEmparejados(partida);
+      // A quien sigue buscando se le avisa cuando se amplía su margen de ELO.
+      for (const e of salas.buscando()) {
+        const b = salas.busquedaDe(e);
+        if (margenAvisado.get(e) !== b.margen) {
+          margenAvisado.set(e, b.margen);
+          io.to(salaDeUsuario(e)).emit("emparejamiento:estado", b);
+        }
+      }
+      for (const e of margenAvisado.keys()) if (!salas.busquedaDe(e)) margenAvisado.delete(e);
+      if (cambiadas.length || creadas.length) difundirLista();
     } catch (err) {
       registro.error("error al revisar plazos", { error: String((err && err.stack) || err) });
     }
@@ -134,6 +170,7 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     } else {
       socket.emit("espectador:estado", null);
     }
+    socket.emit("emparejamiento:estado", salas.busquedaDe(email));
     const actual = salas.partidaDe(email);
     if (!actual) socket.emit("partida:estado", null);
     if (actual) {
@@ -260,6 +297,37 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       return null;
     });
 
+    // RF-33: duelo rápido contra alguien de ELO parecido.
+    manejar("emparejamiento:buscar", async (_datos, jugador) => {
+      const elo = await obtenerElo(email);
+      const r = salas.buscarRival(jugador, elo);
+      if (r.partida) {
+        avisarEmparejados(r.partida);
+        difundirLista();
+        return r.partida;
+      }
+      registro.info("buscando rival", { usuario: email, elo });
+      io.to(salaDeUsuario(email)).emit("emparejamiento:estado", r.buscando);
+      return null;
+    });
+
+    manejar("emparejamiento:cancelar", async () => {
+      salas.cancelarBusqueda(email);
+      io.to(salaDeUsuario(email)).emit("emparejamiento:estado", null);
+      return null;
+    });
+
+    // RF-34: revancha; cuando los dos la piden empieza otro combate en la misma partida.
+    manejar("partida:revancha", async () => {
+      const r = salas.pedirRevancha(email);
+      avisarPartida(r.id);
+      if (r.empieza) {
+        io.to(salaDePartida(r.id)).emit("partida:estado", salas.obtener(r.id));
+        difundirLista();
+      }
+      return null;
+    });
+
     manejar("combate:accion", async (accion) => {
       const id = salas.elegirAccion(email, accion);
       avisarPartida(id);
@@ -272,6 +340,7 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
       const temporizador = setTimeout(async () => {
         const quedan = await io.in(salaDeUsuario(email)).fetchSockets();
         if (quedan.length > 0) return;
+        if (salas.busquedaDe(email)) salas.cancelarBusqueda(email);
         if (salas.partidaDe(email)) abandonar();
         else if (salas.observandoDe(email)) {
           salas.dejarDeObservar(email);

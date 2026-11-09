@@ -47,8 +47,8 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 
 | ID | Requisito | Estimación | Estado |
 |---|---|---|---|
-| RF-33 | Emparejamiento rápido con un rival de ELO parecido | 5 h | pendiente |
-| RF-34 | Revancha al terminar un combate | 3 h | pendiente |
+| RF-33 | Emparejamiento rápido con un rival de ELO parecido | 5 h | hecho |
+| RF-34 | Revancha al terminar un combate | 3 h | hecho |
 
 Total estimado: 43 h.
 
@@ -81,6 +81,11 @@ Igual que en el Sprint 2:
   - tiempo límite para decidir, con elección automática del servidor y derrota por inactividad a la tercera vez seguida (D-31).
 - **PR y etiqueta:** [PR #39](https://github.com/rafamartinez21/procesos-saas/pull/39) a [PR #41](https://github.com/rafamartinez21/procesos-saas/pull/41). Etiqueta `hito-10`.
 - **Desviaciones:** la tirada de crítico se añadió después de la variación de daño, así que hubo que ajustar las secuencias de azar de cuatro pruebas de estados del Sprint 2. No cambió lo que comprueban.
+
+### Hito 11: encontrar partida
+
+- **Qué se hizo:** duelo rápido con emparejamiento por ELO y margen creciente, y revancha en la misma partida.
+- **PR y etiqueta:** [PR #42](https://github.com/rafamartinez21/procesos-saas/pull/42) (RF-33 y RF-34 juntos, porque los dos cambian cómo empieza un combate en `Salas`). Etiqueta `hito-11`.
 
 ## Retrospectiva
 

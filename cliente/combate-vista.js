@@ -231,6 +231,16 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj =
 
 const TEXTO_EFICACIA = { 2: ["Muy eficaz", "eficaz"], 0.5: ["Poco eficaz", "flojo"] };
 
+// RF-34: botón de revancha según quién la ha pedido y si el rival sigue en la partida.
+function botonRevancha(vista, acciones) {
+  const r = vista.revancha;
+  if (!r) return null;
+  if (!r.rivalPresente) return el("p", { class: "suave" }, "Tu rival ha salido de la partida.");
+  if (r.yo) return el("button", { type: "button", class: "secundario", disabled: true }, "Revancha pedida. Esperando a tu rival…");
+  if (r.rival) return el("button", { type: "button", class: "eter latiendo", onclick: () => acciones.revancha() }, "¡Tu rival quiere la revancha! Aceptar");
+  return el("button", { type: "button", class: "eter", onclick: () => acciones.revancha() }, "Revancha");
+}
+
 function resultado(vista, acciones) {
   const texto = vista.ganador === "yo" ? "¡Victoria!" : vista.ganador === "rival" ? "Derrota" : "Empate";
   const fin = vista.eventos.find((e) => e.tipo === "fin");
@@ -239,7 +249,7 @@ function resultado(vista, acciones) {
     { class: `resultado resultado-${vista.ganador || "empate"}` },
     el("p", { class: "resultado-titulo" }, texto),
     fin ? el("p", {}, textoEvento(fin)) : null,
-    el("div", { class: "botones" }, el("button", { type: "button", onclick: () => acciones.salir() }, "Volver al vestíbulo"))
+    el("div", { class: "botones" }, botonRevancha(vista, acciones), el("button", { type: "button", class: "secundario", onclick: () => acciones.salir() }, "Volver al vestíbulo"))
   );
 }
 
