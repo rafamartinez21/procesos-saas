@@ -488,3 +488,134 @@ test("RF-32: contra el Autómata el plazo solo corre para la persona", () => {
   assert.equal(v.fase, "combate");
   assert.equal(v.ausencias, 1);
 });
+
+// ---------- RF-33: emparejamiento rápido ----------
+
+const { margenElo } = require("../servidor/juego/salas.js");
+
+test("RF-33: el margen de ELO empieza en 100 y crece con la espera hasta 400", () => {
+  assert.equal(margenElo(0), 100);
+  assert.equal(margenElo(9999), 100);
+  assert.equal(margenElo(10000), 150);
+  assert.equal(margenElo(30000), 250);
+  assert.equal(margenElo(10 * 60 * 1000), 400);
+});
+
+test("RF-33: si nadie busca, el jugador queda en la cola", () => {
+  const { s } = salasConReloj();
+  const r = s.buscarRival(ana, 1000);
+  assert.deepEqual(r, { buscando: { elo: 1000, esperaMs: 0, margen: 100 } });
+  assert.equal(s.enCola(), 1);
+  assert.equal(s.partidaDe("ana@test.es"), null);
+});
+
+test("RF-33: dos jugadores de ELO parecido se emparejan al momento y empieza la elección de equipo", () => {
+  const { s } = salasConReloj();
+  s.buscarRival(ana, 1000);
+  const { partida } = s.buscarRival(luis, 1080);
+  assert.equal(partida.estado, "completa");
+  assert.deepEqual(partida.jugadores, ["Ana", "Luis"]);
+  assert.equal(s.enCola(), 0);
+  assert.equal(s.vistaCombate("ana@test.es").fase, "seleccion");
+  assert.equal(s.listarAbiertas().length, 0, "no aparece como sala abierta");
+});
+
+test("RF-33: con mucha diferencia de ELO esperan hasta que el margen crece lo bastante", () => {
+  const { s, reloj } = salasConReloj();
+  s.buscarRival(ana, 1000);
+  assert.ok(s.buscarRival(luis, 1220).buscando, "220 > 100: no se emparejan aún");
+  reloj.t = 20000; // margen 200: todavía no
+  assert.deepEqual(s.emparejarCola(), []);
+  reloj.t = 30000; // margen 250 para los dos
+  const creadas = s.emparejarCola();
+  assert.equal(creadas.length, 1);
+  assert.deepEqual(creadas[0].jugadores, ["Ana", "Luis"]);
+});
+
+test("RF-33: se empareja con el más cercano en ELO de los que encajan", () => {
+  const { s } = salasConReloj();
+  // Luis (1090) y Eva (940) no encajan entre sí (150 > 100); Ana (1000) encaja con los dos.
+  s.buscarRival(luis, 1090);
+  assert.ok(s.buscarRival(eva, 940).buscando);
+  const { partida } = s.buscarRival(ana, 1000);
+  assert.deepEqual(partida.jugadores, ["eva", "Ana"], "Eva está a 60 y Luis a 90");
+  assert.ok(s.busquedaDe("luis@test.es"), "Luis sigue buscando");
+});
+
+test("RF-33: [error] no se puede buscar dos veces ni crear partidas mientras se busca; se puede cancelar", () => {
+  const { s } = salasConReloj();
+  s.buscarRival(ana, 1000);
+  esperarError(() => s.buscarRival(ana, 1000), "BUSCANDO_RIVAL");
+  esperarError(() => s.crearPartida(ana), "BUSCANDO_RIVAL");
+  s.cancelarBusqueda("ana@test.es");
+  assert.equal(s.busquedaDe("ana@test.es"), null);
+  esperarError(() => s.cancelarBusqueda("ana@test.es"), "NO_BUSCANDO");
+  assert.ok(s.crearPartida(ana));
+});
+
+// ---------- RF-34: revancha ----------
+
+function combateTerminado() {
+  const terminadas = [];
+  const reloj = { t: 0 };
+  const s = new Salas({ generarId: () => "V1", ahora: () => reloj.t, aleatorio: () => 0.5, alTerminar: (r) => terminadas.push(r) });
+  s.crearPartida(ana);
+  s.unirse("V1", luis);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  s.elegirEquipo("luis@test.es", ["voltarda", "rocadonte", "ciclonia"]);
+  s.abandonar("luis@test.es"); // Luis se rinde... y sale
+  return { s, terminadas };
+}
+
+test("RF-34: [error] no hay revancha si el combate sigue o si el rival ya se fue", () => {
+  const { s } = duelo();
+  esperarError(() => s.pedirRevancha("ana@test.es"), "COMBATE_EN_CURSO");
+  const fuera = combateTerminado();
+  esperarError(() => fuera.s.pedirRevancha("ana@test.es"), "RIVAL_SE_FUE");
+});
+
+test("RF-34: cuando los dos piden la revancha empieza otro combate en la misma partida", () => {
+  const terminadas = [];
+  const reloj = { t: 0 };
+  const s = new Salas({ generarId: () => "V1", ahora: () => reloj.t, aleatorio: () => 0.5, alTerminar: (r) => terminadas.push(r) });
+  s.crearPartida(ana);
+  s.unirse("V1", luis);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  s.elegirEquipo("luis@test.es", ["voltarda", "rocadonte", "ciclonia"]);
+  // Luis deja pasar tres plazos: pierde por inactividad, pero sigue en la partida.
+  for (let i = 0; i < 3; i++) {
+    s.elegirAccion("ana@test.es", { tipo: "cambiar", indice: s.vistaCombate("ana@test.es").yo.activa === 0 ? 1 : 0 });
+    reloj.t += 45000;
+    s.vencerPlazos();
+  }
+  assert.equal(s.vistaCombate("ana@test.es").fase, "terminada");
+  assert.deepEqual(s.vistaCombate("ana@test.es").revancha, { yo: false, rival: false, rivalPresente: true });
+  assert.deepEqual(s.pedirRevancha("ana@test.es"), { id: "V1", empieza: false });
+  assert.deepEqual(s.vistaCombate("luis@test.es").revancha, { yo: false, rival: true, rivalPresente: true });
+  assert.deepEqual(s.pedirRevancha("luis@test.es"), { id: "V1", empieza: true });
+  const v = s.vistaCombate("ana@test.es");
+  assert.equal(v.fase, "seleccion");
+  assert.equal(v.revancha, undefined);
+  assert.equal(s.obtener("V1").estado, "completa");
+  // Cada combate se registra con su propio id.
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  s.elegirEquipo("luis@test.es", ["voltarda", "rocadonte", "ciclonia"]);
+  s.abandonar("luis@test.es");
+  assert.deepEqual(terminadas.map((t) => t.id), ["V1", "V1-2"]);
+});
+
+test("RF-34: contra el Autómata la revancha empieza en cuanto la pides", () => {
+  const { s } = salasConReloj();
+  s.crearPartidaContraMaquina(ana);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  // Ana se rinde sin salir: se simula terminando el combate a mano.
+  const id = s.partidaDe("ana@test.es").id;
+  for (let i = 0; i < 300 && s.vistaCombate("ana@test.es").fase !== "terminada"; i++) {
+    const v = s.vistaCombate("ana@test.es");
+    if (v.yo.debeCambiar) s.elegirAccion("ana@test.es", { tipo: "cambiar", indice: v.yo.equipo.findIndex((c, j) => c.ps > 0 && j !== v.yo.activa) });
+    else if (!v.yo.eleccionHecha && !v.rival.debeCambiar) s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "embestida" });
+  }
+  assert.equal(s.vistaCombate("ana@test.es").fase, "terminada");
+  assert.deepEqual(s.pedirRevancha("ana@test.es"), { id, empieza: true });
+  assert.equal(s.vistaCombate("ana@test.es").fase, "seleccion");
+});

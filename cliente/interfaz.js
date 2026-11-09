@@ -286,7 +286,7 @@ async function pantallaPrincipal(usuario) {
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
 function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo = () => {} } = {}) {
-  const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, conectado: false, catalogo: [], seleccion: [], filtro: null, chat: [] };
+  const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, busqueda: null, conectado: false, catalogo: [], seleccion: [], filtro: null, chat: [] };
   const zona = el("div", { class: "vestibulo" });
   // Controladores de la arena (RF-28): viven mientras dura el combate o mientras se mira
   // una partida, para que redibujar el vestíbulo no corte las animaciones.
@@ -324,6 +324,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
     atacar: (movimiento) => enCombate(() => ClienteJuego.atacar(movimiento)),
     cambiar: (indice) => enCombate(() => ClienteJuego.cambiar(indice)),
     salir: () => ejecutar(() => ClienteJuego.abandonar()),
+    revancha: () => enCombate(() => ClienteJuego.pedirRevancha()),
   };
 
   const ejecutar = async (fn) => {
@@ -412,6 +413,35 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
         botonCopiar(p.id),
         el("button", { type: "button", class: "peligro", onclick: () => ejecutar(() => ClienteJuego.abandonar()) }, "Cancelar sala")
       )
+    );
+  }
+
+  // RF-33: buscando rival. El tiempo de espera cuenta en el cliente desde lo que dijo el
+  // servidor; el margen de ELO lo calcula el servidor y llega con cada aviso.
+  let relojBusqueda = null;
+  function panelBusqueda(b) {
+    const espera = el("strong", { class: "espera-tiempo" });
+    const inicio = b.recibida - b.esperaMs;
+    const pintarEspera = () => {
+      const seg = Math.floor((Date.now() - inicio) / 1000);
+      espera.textContent = `${Math.floor(seg / 60)}:${String(seg % 60).padStart(2, "0")}`;
+      if (!espera.isConnected && relojBusqueda) {
+        clearInterval(relojBusqueda);
+        relojBusqueda = null;
+      }
+    };
+    clearInterval(relojBusqueda);
+    pintarEspera();
+    relojBusqueda = setInterval(pintarEspera, 500);
+    return el(
+      "section",
+      { class: "panel espera" },
+      el("div", { class: "anillo" }, emblema()),
+      el("span", { class: "etiqueta-seccion" }, "Duelo rápido"),
+      el("h2", { style: "margin:6px 0 2px" }, "Buscando un rival a tu altura…"),
+      el("p", { class: "suave" }, `Tu ELO: ${b.elo}. Ahora se busca a alguien a ±${b.margen} puntos; cuanto más esperes, más se amplía.`),
+      el("div", { class: "codigo-grande", "aria-live": "off" }, espera),
+      el("button", { type: "button", class: "peligro", onclick: () => enCombate(() => ClienteJuego.cancelarBusqueda()) }, "Cancelar búsqueda")
     );
   }
 
@@ -532,6 +562,13 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
         { class: "modos" },
         el(
           "div",
+          { class: "modo rapido" },
+          el("span", { class: "modo-icono", "aria-hidden": "true" }, "⚡"),
+          el("div", { class: "modo-texto" }, el("h3", {}, "Duelo rápido"), el("p", {}, "Te emparejamos con un invocador de ELO parecido. Cuenta para el ranking.")),
+          el("button", { type: "button", onclick: () => enCombate(() => ClienteJuego.buscarRival()) }, "Buscar rival")
+        ),
+        el(
+          "div",
           { class: "modo" },
           iconoModo("⚔"),
           el("h3", {}, "Crear sala"),
@@ -582,6 +619,7 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
     }
     if (estado.partida && estado.combate) return zona.replaceChildren(panelPartida(estado.partida));
     if (estado.partida) return zona.replaceChildren(salaDeEspera(estado.partida));
+    if (estado.busqueda) return zona.replaceChildren(panelBusqueda(estado.busqueda));
     zona.replaceChildren(...vestibuloLibre().filter(Boolean));
   }
 
@@ -614,6 +652,10 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       if (v.fase !== "seleccion") estado.seleccion = [];
       if (!controlador) controlador = crearControladorCombate({ acciones: accionesCombate, contexto: contextoSeleccion });
       controlador.actualizar(v);
+      dibujar();
+    },
+    alCambiarBusqueda: (b) => {
+      estado.busqueda = b ? { ...b, recibida: Date.now() } : null;
       dibujar();
     },
     alCambiarEnCurso: (lista) => {

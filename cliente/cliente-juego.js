@@ -33,7 +33,8 @@ function accion(evento, datos) {
 export const ClienteJuego = {
   // avisos: { alCambiarLista(partidas), alCambiarPartida(partida), alAbandonarRival(partida),
   //           alCambiarCombate(vista), alRecibirMensaje(m), alRecibirHistorialChat(lista),
-//           alCambiarEnCurso(lista), alCambiarEspectador(vista), alTerminarEspectador(), alDesconectar(motivo) }
+//           alCambiarEnCurso(lista), alCambiarEspectador(vista), alTerminarEspectador(), alDesconectar(motivo),
+  //           alCambiarBusqueda(busqueda | null) }
   conectar(avisos = {}) {
     this.desconectar();
     socket = io({ transports: ["websocket", "polling"] });
@@ -46,6 +47,7 @@ export const ClienteJuego = {
     socket.on("espectador:estado", (v) => avisos.alCambiarEspectador && avisos.alCambiarEspectador(v));
     socket.on("espectador:fin", () => avisos.alTerminarEspectador && avisos.alTerminarEspectador());
     socket.on("chat:historial", (lista) => avisos.alRecibirHistorialChat && avisos.alRecibirHistorialChat(lista));
+    socket.on("emparejamiento:estado", (b) => avisos.alCambiarBusqueda && avisos.alCambiarBusqueda(b));
     socket.on("connect", () => avisos.alConectar && avisos.alConectar());
     socket.on("connect_error", (err) => avisos.alDesconectar && avisos.alDesconectar(err.message));
     socket.on("disconnect", (motivo) => avisos.alDesconectar && avisos.alDesconectar(motivo));
@@ -67,4 +69,7 @@ export const ClienteJuego = {
   enviarMensaje: (texto) => accion("chat:enviar", { texto }),
   observar: (id) => accion("partida:observar", { id }),
   dejarDeObservar: () => accion("partida:dejar-observar"),
+  buscarRival: () => accion("emparejamiento:buscar"), // RF-33
+  cancelarBusqueda: () => accion("emparejamiento:cancelar"),
+  pedirRevancha: () => accion("partida:revancha"), // RF-34
 };

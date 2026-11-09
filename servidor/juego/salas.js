@@ -32,6 +32,17 @@ const JUGADORES_POR_PARTIDA = 2;
 const PLAZO_EQUIPO_MS = 60 * 1000;
 const PLAZO_TURNO_MS = 45 * 1000;
 const AUSENCIAS_PARA_PERDER = 3;
+
+// RF-33: emparejamiento rápido. Dos jugadores se emparejan si la diferencia de ELO no pasa
+// del margen de los dos. El margen empieza en 100 y crece 50 cada 10 s de espera, hasta 400:
+// primero se busca alguien parecido y, si no hay, poco a poco se acepta a cualquiera.
+const MARGEN_ELO_INICIAL = 100;
+const MARGEN_ELO_PASO = 50;
+const MARGEN_ELO_CADA_MS = 10 * 1000;
+const MARGEN_ELO_MAXIMO = 400;
+function margenElo(esperaMs) {
+  return Math.min(MARGEN_ELO_MAXIMO, MARGEN_ELO_INICIAL + MARGEN_ELO_PASO * Math.floor(Math.max(0, esperaMs) / MARGEN_ELO_CADA_MS));
+}
 const ESTADO_ABIERTA = "abierta"; // esperando rival
 const ESTADO_COMPLETA = "completa"; // ya hay dos jugadores: se está combatiendo
 const ESTADO_TERMINADA = "terminada"; // el combate ha acabado; los jugadores aún no han salido
@@ -82,6 +93,7 @@ function Salas({
 } = {}) {
   const partidas = new Map(); // id -> { id, estado, jugadores: [{email, nombre}], creada, combate, participantes, espectadores }
   const observando = new Map(); // email del espectador -> id de la partida (RF-23)
+  const cola = new Map(); // RF-33: email -> { jugador, elo, desde }
 
   // Partida interna (con emails) en la que está un jugador, o undefined.
   const buscarDe = (email) => {
@@ -101,6 +113,7 @@ function Salas({
     if (buscarDe(email) || observando.has(email)) {
       throw new ErrorNegocio("YA_EN_PARTIDA", "Ya estás en una partida; abandónala antes de entrar en otra");
     }
+    if (cola.has(email)) throw new ErrorNegocio("BUSCANDO_RIVAL", "Estás buscando rival; cancela la búsqueda antes");
   };
 
   // Vista pública de la partida del jugador, o null.
@@ -146,13 +159,23 @@ function Salas({
     partida.jugadores.push(j);
     if (partida.jugadores.length === JUGADORES_POR_PARTIDA) {
       // Con dos jugadores empieza el combate (hito 6): primero, elegir equipos.
-      partida.estado = ESTADO_COMPLETA;
-      partida.participantes = partida.jugadores.map((x) => ({ ...x }));
-      partida.combate = new Combate(partida.participantes.map((x) => x.email), { aleatorio });
-      actualizarPlazo(partida);
+      empezarCombate(partida);
     }
     return vistaPublica(partida);
   };
+
+  // Empieza un combate (el primero o una revancha) entre los dos jugadores de la partida.
+  function empezarCombate(partida) {
+    partida.estado = ESTADO_COMPLETA;
+    partida.participantes = partida.jugadores.map((x) => ({ ...x }));
+    partida.combate = new Combate(partida.participantes.map((x) => x.email), { aleatorio });
+    partida.ronda = (partida.ronda || 0) + 1;
+    partida.revancha = new Set();
+    partida.ausencias = {};
+    partida.firmaPlazo = null;
+    jugarMaquina(partida);
+    actualizarPlazo(partida);
+  }
 
   // Si el combate acaba de terminar, la partida pasa a terminada y se avisa una sola vez.
   // Las partidas contra la máquina no cuentan para el historial ni el ranking (D-25).
@@ -161,7 +184,8 @@ function Salas({
       partida.estado = ESTADO_TERMINADA;
       if (partida.contraMaquina) return;
       alTerminar({
-        id: partida.id,
+        // Cada combate de la partida (RF-34: revanchas) tiene su propio id de resultado.
+        id: partida.ronda > 1 ? `${partida.id}-${partida.ronda}` : partida.id,
         jugadores: partida.participantes,
         ganador: partida.combate.ganador,
         motivo: partida.combate.motivo,
@@ -228,11 +252,8 @@ function Salas({
     while (partidas.has(id)) id = generarId();
     const maquina = { email: `${PREFIJO_MAQUINA}${id}`, nombre: NOMBRE_MAQUINA };
     const partida = { id, estado: ESTADO_COMPLETA, jugadores: [j, maquina], creada: ahora(), contraMaquina: true };
-    partida.participantes = partida.jugadores.map((x) => ({ ...x }));
-    partida.combate = new Combate([j.email, maquina.email], { aleatorio });
     partidas.set(id, partida);
-    jugarMaquina(partida);
-    actualizarPlazo(partida);
+    empezarCombate(partida);
     return vistaPublica(partida);
   };
 
@@ -303,7 +324,101 @@ function Salas({
     const leToca = partida.plazo && partida.estado === ESTADO_COMPLETA && pendientesDe(partida).includes(email);
     vista.plazoMs = leToca ? Math.max(0, partida.plazo - ahora()) : null;
     vista.ausencias = (partida.ausencias && partida.ausencias[email]) || 0;
+    if (partida.estado === ESTADO_TERMINADA) {
+      const rival = partida.participantes.find((j) => j.email !== email);
+      vista.revancha = {
+        yo: partida.revancha.has(email),
+        rival: Boolean(rival && partida.revancha.has(rival.email)),
+        rivalPresente: partida.jugadores.length === JUGADORES_POR_PARTIDA,
+      };
+    }
     return vista;
+  };
+
+  // ---------- RF-34: revancha ----------
+
+  // Pide la revancha tras un combate terminado. Cuando los dos la han pedido (la máquina la
+  // acepta siempre), empieza otro combate en la misma partida. Devuelve { id, empieza }.
+  this.pedirRevancha = function (email) {
+    const partida = buscarDe(email);
+    if (!partida || !partida.combate) throw new ErrorNegocio("NO_EN_COMBATE", "No estás en ningún combate");
+    if (partida.estado !== ESTADO_TERMINADA) throw new ErrorNegocio("COMBATE_EN_CURSO", "El combate aún no ha terminado");
+    if (partida.jugadores.length < JUGADORES_POR_PARTIDA) throw new ErrorNegocio("RIVAL_SE_FUE", "Tu rival ya ha salido de la partida");
+    partida.revancha.add(email);
+    if (partida.contraMaquina) partida.revancha.add(partida.jugadores[1].email);
+    const empieza = partida.jugadores.every((j) => partida.revancha.has(j.email));
+    if (empieza) empezarCombate(partida);
+    return { id: partida.id, empieza };
+  };
+
+  // ---------- RF-33: emparejamiento rápido ----------
+
+  // Busca rival con un ELO parecido. Si hay alguien compatible en la cola, crea la partida
+  // con los dos (ya completa) y devuelve { partida }; si no, entra en la cola y devuelve
+  // { buscando }.
+  this.buscarRival = function (jugador, elo) {
+    const j = validarJugador(jugador);
+    exigirLibre(j.email);
+    const t = ahora();
+    const entrada = { jugador: j, elo: Number.isFinite(elo) ? elo : 1000, desde: t };
+    const rival = mejorRival(entrada, t);
+    if (rival) return { partida: emparejar(rival, entrada) };
+    cola.set(j.email, entrada);
+    return { buscando: this.busquedaDe(j.email) };
+  };
+
+  this.cancelarBusqueda = function (email) {
+    if (!cola.delete(email)) throw new ErrorNegocio("NO_BUSCANDO", "No estás buscando rival");
+  };
+
+  // Estado de la búsqueda de un jugador, o null: { elo, esperaMs, margen }.
+  this.busquedaDe = function (email) {
+    const e = cola.get(email);
+    if (!e) return null;
+    const espera = ahora() - e.desde;
+    return { elo: e.elo, esperaMs: espera, margen: margenElo(espera) };
+  };
+
+  this.enCola = () => cola.size;
+  this.buscando = () => [...cola.keys()]; // emails en la cola
+
+  // Rival compatible más cercano en ELO (los dos márgenes deben cubrir la diferencia).
+  function mejorRival(entrada, t) {
+    let mejor = null;
+    for (const otra of cola.values()) {
+      if (otra.jugador.email === entrada.jugador.email) continue;
+      const diferencia = Math.abs(otra.elo - entrada.elo);
+      if (diferencia > margenElo(t - otra.desde) || diferencia > margenElo(t - entrada.desde)) continue;
+      if (!mejor || diferencia < Math.abs(mejor.elo - entrada.elo)) mejor = otra;
+    }
+    return mejor;
+  }
+
+  // Crea la partida de dos jugadores de la cola (el que llevaba más esperando es el primero).
+  function emparejar(a, b) {
+    cola.delete(a.jugador.email);
+    cola.delete(b.jugador.email);
+    let id = generarId();
+    while (partidas.has(id)) id = generarId();
+    const [primero, segundo] = a.desde <= b.desde ? [a, b] : [b, a];
+    const partida = { id, estado: ESTADO_ABIERTA, jugadores: [primero.jugador, segundo.jugador], creada: ahora(), emparejada: true };
+    partidas.set(id, partida);
+    empezarCombate(partida);
+    return vistaPublica(partida);
+  }
+
+  // Con el tiempo los márgenes crecen: la capa de tiempo real llama a esto cada segundo.
+  // Devuelve las partidas creadas.
+  this.emparejarCola = function () {
+    const creadas = [];
+    const t = ahora();
+    const esperando = [...cola.values()].sort((x, y) => x.desde - y.desde);
+    for (const entrada of esperando) {
+      if (!cola.has(entrada.jugador.email)) continue; // ya emparejado en esta vuelta
+      const rival = mejorRival(entrada, t);
+      if (rival) creadas.push(emparejar(entrada, rival));
+    }
+    return creadas;
   };
 
   // RF-22: mensaje en el chat de la partida del jugador. Devuelve { id, mensaje } para que
@@ -417,4 +532,4 @@ function Salas({
   };
 }
 
-module.exports = { Salas, PLAZO_EQUIPO_MS, PLAZO_TURNO_MS, AUSENCIAS_PARA_PERDER, esMaquina, NOMBRE_MAQUINA, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };
+module.exports = { Salas, PLAZO_EQUIPO_MS, PLAZO_TURNO_MS, AUSENCIAS_PARA_PERDER, margenElo, esMaquina, NOMBRE_MAQUINA, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };

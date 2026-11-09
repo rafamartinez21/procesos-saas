@@ -437,3 +437,76 @@ test("RF-32: al acabarse el plazo el servidor elige por quien falta y avisa a lo
   assert.equal(deLuis.ausencias, 1);
   assert.equal(deAna.ausencias, 0);
 });
+
+// ---------- RF-33 y RF-34 ----------
+
+test("RF-33: dos jugadores que buscan duelo rápido acaban en la misma partida eligiendo equipo", async () => {
+  const ana = await clienteDe("ana@test.es");
+  const luis = await clienteDe("luis@test.es");
+  await Promise.all([listo(ana), listo(luis)]);
+  const buscando = esperarQue(ana, "emparejamiento:estado", (b) => b !== null);
+  const r1 = await emitir(ana, "emparejamiento:buscar");
+  assert.equal(r1.ok, true);
+  assert.equal(r1.partida, null);
+  assert.equal((await buscando).margen, 100);
+  const seleccionAna = esperarQue(ana, "combate:estado", (v) => v.fase === "seleccion");
+  const finBusqueda = esperarQue(ana, "emparejamiento:estado", (b) => b === null);
+  const r2 = await emitir(luis, "emparejamiento:buscar");
+  assert.deepEqual(r2.partida.jugadores, ["Ana", "Luis"]);
+  await Promise.all([seleccionAna, finBusqueda]);
+});
+
+test("RF-33: se puede cancelar la búsqueda", async () => {
+  const ana = await clienteDe("ana@test.es");
+  await listo(ana);
+  await emitir(ana, "emparejamiento:buscar");
+  const fin = esperarQue(ana, "emparejamiento:estado", (b) => b === null);
+  assert.equal((await emitir(ana, "emparejamiento:cancelar")).ok, true);
+  await fin;
+  assert.equal((await emitir(ana, "emparejamiento:cancelar")).error, "NO_BUSCANDO");
+});
+
+test("RF-34: tras el combate, la revancha empieza cuando la piden los dos", async () => {
+  const ana = await clienteDe("ana@test.es");
+  const luis = await clienteDe("luis@test.es");
+  await Promise.all([listo(ana), listo(luis)]);
+  await emitir(ana, "emparejamiento:buscar");
+  await emitir(luis, "emparejamiento:buscar");
+  // Se juega el combate hasta el final directamente con la lógica (sin salir de la partida).
+  const id = salas.partidaDe("ana@test.es").id;
+  salas.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  salas.elegirEquipo("luis@test.es", ["voltarda", "rocadonte", "ciclonia"]);
+  assert.equal(salas.vistaCombate("ana@test.es").fase, "combate");
+  for (let i = 0; i < 300 && salas.vistaCombate("ana@test.es").fase !== "terminada"; i++) {
+    for (const e of ["ana@test.es", "luis@test.es"]) {
+      const v = salas.vistaCombate(e);
+      if (v.fase === "terminada") break;
+      if (v.yo.debeCambiar) salas.elegirAccion(e, { tipo: "cambiar", indice: v.yo.equipo.findIndex((x, j) => x.ps > 0 && j !== v.yo.activa) });
+      else if (!v.yo.eleccionHecha && !v.rival.debeCambiar) salas.elegirAccion(e, { tipo: "atacar", movimiento: v.yo.equipo[v.yo.activa].movimientos.find((m) => !m.apoyo).id });
+    }
+  }
+  assert.equal(salas.vistaCombate("ana@test.es").fase, "terminada");
+  const avisoLuis = esperarQue(luis, "combate:estado", (v) => v.revancha && v.revancha.rival);
+  assert.equal((await emitir(ana, "partida:revancha")).ok, true);
+  await avisoLuis;
+  const nuevo = esperarQue(ana, "combate:estado", (v) => v.fase === "seleccion");
+  assert.equal((await emitir(luis, "partida:revancha")).ok, true);
+  await nuevo;
+  assert.equal(salas.partidaDe("ana@test.es").id, id);
+});
+
+test("RF-33: mientras busca, al jugador se le avisa cuando se amplía su margen de ELO", async () => {
+  await new Promise((resolve) => io.close(resolve));
+  let t = 0;
+  salas = new Salas({ ahora: () => t });
+  servidor = http.createServer(crearApp(sistema, { sesiones, registro: registroSilencioso }));
+  io = conectarTiempoReal(servidor, { sistema, salas, sesiones, registro: registroSilencioso, esperaReconexionMs: 50, intervaloPlazosMs: 20 });
+  await new Promise((resolve) => servidor.listen(0, resolve));
+  base = `http://127.0.0.1:${servidor.address().port}`;
+  const ana = await clienteDe("ana@test.es");
+  await listo(ana);
+  await emitir(ana, "emparejamiento:buscar");
+  const ampliado = esperarQue(ana, "emparejamiento:estado", (b) => b && b.margen === 150);
+  t = 10000;
+  assert.equal((await ampliado).margen, 150);
+});

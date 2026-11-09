@@ -97,7 +97,9 @@ async function main() {
       );
     },
   });
-  conectarTiempoReal(servidor, { sistema, salas, sesiones, registro });
+  // RF-33: el emparejamiento rápido usa el ELO guardado de cada jugador.
+  const obtenerElo = async (email) => (await progreso.estadisticas(email)).elo;
+  conectarTiempoReal(servidor, { sistema, salas, sesiones, registro, obtenerElo });
 }
 
 main().catch((err) => {
