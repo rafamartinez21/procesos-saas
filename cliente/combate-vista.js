@@ -61,10 +61,62 @@ function textoEvento(ev) {
     case "fin":
       if (ev.motivo === "empate") return "¡Empate! Las dos últimas criaturas caen a la vez.";
       if (ev.motivo === "abandono") return ev.ganador === "yo" ? "Tu rival ha abandonado." : "Has abandonado el combate.";
+      if (ev.motivo === "inactividad") return ev.ganador === "yo" ? "Tu rival ha dejado pasar tres turnos seguidos y pierde." : "Has dejado pasar tres turnos seguidos y pierdes el combate.";
       return ev.ganador === "yo" ? "¡Has ganado el combate!" : "Has perdido el combate.";
     default:
       return "";
   }
+}
+
+// ---------- tiempo para decidir (RF-32) ----------
+
+// Cuenta atrás que se queda en pantalla entre redibujados. poner(ms, clave): ms que quedan
+// según el servidor (o null si ahora no te toca); clave identifica la decisión, para saber
+// cuándo empieza una nueva y llenar la barra.
+function crearReloj() {
+  const texto = el("span", { class: "reloj-texto" });
+  const relleno = el("span", { class: "reloj-relleno" });
+  const nodo = el("div", { class: "reloj", role: "timer", "aria-live": "off", hidden: true }, el("span", { class: "reloj-icono", "aria-hidden": "true" }, "⏳"), texto, el("span", { class: "reloj-barra", "aria-hidden": "true" }, relleno));
+  let fin = null;
+  let total = 1;
+  let clave = null;
+  let intervalo = null;
+
+  function pintar() {
+    if (fin === null) return;
+    const ms = Math.max(0, fin - Date.now());
+    const seg = Math.ceil(ms / 1000);
+    texto.textContent = seg > 0 ? `${seg} s` : "¡Tiempo!";
+    relleno.style.width = `${Math.round((100 * ms) / total)}%`;
+    nodo.classList.toggle("urgente", ms <= 10000);
+    nodo.setAttribute("aria-label", `Te quedan ${seg} segundos para decidir`);
+    if (ms === 0 || !nodo.isConnected) parar();
+  }
+  function parar() {
+    clearInterval(intervalo);
+    intervalo = null;
+  }
+  function poner(ms, nuevaClave) {
+    if (ms === null || ms === undefined) {
+      fin = null;
+      nodo.hidden = true;
+      return parar();
+    }
+    if (nuevaClave !== clave) {
+      clave = nuevaClave;
+      total = Math.max(ms, 1);
+    }
+    fin = Date.now() + ms;
+    nodo.hidden = false;
+    pintar();
+    if (!intervalo) intervalo = setInterval(pintar, 250);
+  }
+  return { nodo, poner };
+}
+
+function avisoAusencias(vista) {
+  if (!vista.ausencias) return null;
+  return el("p", { class: "aviso-ausencias" }, `Se acabó tu tiempo y el servidor eligió por ti (${vista.ausencias} de 3 seguidas). A la tercera, pierdes el combate.`);
 }
 
 // ---------- elección de equipo (RF-16) ----------
@@ -112,7 +164,7 @@ function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada }) {
   );
 }
 
-function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro) {
+function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj = null) {
   const porId = new Map(catalogo.map((c) => [c.id, c]));
   if (vista.yo.eleccionHecha) {
     return el(
@@ -163,9 +215,11 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro) {
         return cartaCriatura(c, { orden: i >= 0 ? i + 1 : 0, maximos, bloqueada: lleno, alPulsar: () => acciones.alternarSeleccion(c.id) });
       })
     ),
+    avisoAusencias(vista),
     el(
       "div",
       { class: "bandeja" },
+      reloj ? reloj.nodo : null,
       el("div", { class: "ranuras" }, ...ranuras),
       el("span", { class: "texto-bandeja" }, lleno ? "La número 1 sale a combatir." : `Elige ${3 - seleccion.length} más.`),
       el("button", { type: "button", disabled: !lleno, onclick: () => acciones.confirmarEquipo() }, "¡Al combate!")
@@ -247,18 +301,19 @@ function botonesMovimientos(vista, acciones) {
 
 const esperaTurno = (texto) => el("div", { class: "controles espera-turno" }, el("span", { class: "puntos", "aria-hidden": "true" }), texto);
 
-function controlesJugador(vista, acciones) {
+function controlesJugador(vista, acciones, reloj) {
   if (vista.fase === "terminada") return resultado(vista, acciones);
   const mia = vista.yo.equipo[vista.yo.activa];
   if (vista.yo.debeCambiar) {
-    return el("div", { class: "controles" }, el("p", { class: "aviso-error" }, `${mia.nombre} no puede seguir. ¿Quién sale ahora?`), banquillo(vista, acciones, { titulo: "Elige quién sale" }));
+    return el("div", { class: "controles" }, el("div", { class: "fila-pregunta" }, el("p", { class: "aviso-error" }, `${mia.nombre} no puede seguir. ¿Quién sale ahora?`), reloj.nodo), avisoAusencias(vista), banquillo(vista, acciones, { titulo: "Elige quién sale" }));
   }
   if (vista.rival.debeCambiar) return esperaTurno("Tu rival está eligiendo otra criatura…");
   if (vista.yo.eleccionHecha) return esperaTurno(vista.rival.eleccionHecha ? "Resolviendo el turno…" : "Acción elegida. Esperando a tu rival…");
   return el(
     "div",
     { class: "controles" },
-    el("p", { class: "pregunta" }, el("span", { class: "etiqueta-seccion" }, `Turno ${vista.turno}`), " ", `¿Qué hará ${mia.nombre}?`),
+    el("div", { class: "fila-pregunta" }, el("p", { class: "pregunta" }, el("span", { class: "etiqueta-seccion" }, `Turno ${vista.turno}`), " ", `¿Qué hará ${mia.nombre}?`), reloj.nodo),
+    avisoAusencias(vista),
     botonesMovimientos(vista, acciones),
     banquillo(vista, acciones)
   );
@@ -292,6 +347,7 @@ export function crearControladorCombate({ acciones, contexto }) {
   const nodo = el("div", { class: "combate" });
   const zonaControles = el("div", { class: "zona-controles" });
   const cronica = crearCronica(textoEvento);
+  const reloj = crearReloj();
   let arena = null;
   let ultima = null; // última vista recibida
   let firmaMostrada = null; // turno y eventos que ya se han reproducido
@@ -314,16 +370,23 @@ export function crearControladorCombate({ acciones, contexto }) {
     if (reproduciendo) return zonaControles.replaceChildren(esperaTurno("Resolviendo el turno…"));
     cronica.actualizar(ultima.cronica);
     if (ultima.yo.debeCambiar) arena.narrar("¡Tu criatura ha caído!");
-    zonaControles.replaceChildren(controlesJugador(ultima, acciones));
+    zonaControles.replaceChildren(controlesJugador(ultima, acciones, reloj));
   }
 
+  let vistaReloj = null;
   function actualizar(v) {
     ultima = v;
+    // El plazo cuenta desde que llega la vista (no desde que se termina de animar), y solo
+    // se reajusta con cada vista nueva del servidor, no al redibujar.
+    if (v !== vistaReloj) {
+      vistaReloj = v;
+      reloj.poner(v.plazoMs, v.fase === "seleccion" ? "seleccion" : firmaDe(v));
+    }
     if (v.fase === "seleccion") {
       arena = null;
       firmaMostrada = null;
       const { catalogo, seleccion, filtro } = contexto();
-      nodo.replaceChildren(pantallaSeleccion(v, catalogo, acciones, seleccion, filtro));
+      nodo.replaceChildren(pantallaSeleccion(v, catalogo, acciones, seleccion, filtro, reloj));
       return;
     }
     // Si alguien abandonó antes de elegir equipos, solo hay resultado.
@@ -405,6 +468,7 @@ function textoEventoEspectador(ev) {
     case "fin":
       if (ev.motivo === "empate") return "¡Empate!";
       if (ev.motivo === "abandono") return `${ev.ganador} gana porque su rival ha abandonado.`;
+      if (ev.motivo === "inactividad") return `${ev.ganador} gana porque su rival dejó pasar tres turnos seguidos.`;
       return `¡${ev.ganador} gana el combate!`;
     default:
       return "";

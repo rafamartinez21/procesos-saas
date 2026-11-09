@@ -188,3 +188,9 @@ timestamp: 2026-10-28
 - **Por qué:** con solo ataques, la mejor jugada era siempre el movimiento más eficaz. Las etapas premian preparar el golpe y castigan quedarse demasiado tiempo, porque cambiar de criatura las borra. Dárselos a las criaturas lentas compensa que casi siempre atacan después. El tope de ±2 evita combates que se decidan solo acumulando etapas.
 - **Estado:** vigente.
 
+## D-31 Los plazos viven en la lógica con un reloj inyectado y el tiempo real solo los revisa
+
+- **Qué se decidió:** `Salas` guarda para cada partida el momento en que vence la decisión actual (60 s para elegir equipo y 45 s por turno) y lo reinicia cada vez que se abre una decisión nueva. `Salas.vencerPlazos()` decide por quien falta con la misma lógica que el Autómata (D-25) y cuenta sus ausencias seguidas; a la tercera, ese jugador pierde con el motivo `inactividad`, que cuenta para el ELO como un abandono. Decidir a tiempo pone las ausencias a cero. La capa de tiempo real llama a `vencerPlazos` cada segundo y avisa a los jugadores de las partidas que han cambiado. La vista de cada jugador lleva el tiempo que le queda (`plazoMs`) solo cuando le toca decidir.
+- **Por qué:** sin plazo, un jugador podía dejar el combate parado para siempre y su rival solo podía rendirse. Con el reloj inyectado (`ahora`), las pruebas adelantan el tiempo sin esperar. El cliente recibe los milisegundos que quedan y no una hora absoluta, así que no le afecta que su reloj vaya adelantado o atrasado. Como las partidas viven en memoria en una sola instancia (D-21), un temporizador por servidor basta.
+- **Estado:** vigente.
+

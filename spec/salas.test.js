@@ -387,3 +387,104 @@ test("cuando la partida desaparece, sus espectadores quedan libres", () => {
   assert.equal(s.observandoDe("eva@test.es"), null);
   assert.equal(s.crearPartida(eva).id, "P1");
 });
+
+// ---------- RF-32: tiempo límite para decidir ----------
+
+// Salas con un reloj que la prueba adelanta a mano.
+function salasConReloj() {
+  const reloj = { t: 0 };
+  let n = 0;
+  const s = new Salas({ generarId: () => `R${++n}`, ahora: () => reloj.t, aleatorio: () => 0.5, plazoEquipoMs: 60000, plazoTurnoMs: 45000 });
+  return { s, reloj };
+}
+
+function duelo() {
+  const { s, reloj } = salasConReloj();
+  s.crearPartida(ana);
+  s.unirse("R1", luis);
+  return { s, reloj };
+}
+
+test("RF-32: la vista dice cuánto tiempo queda para decidir, solo a quien le toca", () => {
+  const { s, reloj } = duelo();
+  assert.equal(s.vistaCombate("ana@test.es").plazoMs, 60000);
+  reloj.t = 15000;
+  assert.equal(s.vistaCombate("ana@test.es").plazoMs, 45000);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  assert.equal(s.vistaCombate("ana@test.es").plazoMs, null, "ya ha elegido");
+  assert.equal(s.vistaCombate("luis@test.es").plazoMs, 45000);
+});
+
+test("RF-32: antes del plazo no pasa nada", () => {
+  const { s, reloj } = duelo();
+  reloj.t = 59999;
+  assert.deepEqual(s.vencerPlazos(), []);
+  assert.equal(s.vistaCombate("ana@test.es").fase, "seleccion");
+});
+
+test("RF-32: si se acaba el tiempo de elegir equipo, el servidor elige uno válido por quien falta", () => {
+  const { s, reloj } = duelo();
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  reloj.t = 60000;
+  assert.deepEqual(s.vencerPlazos(), ["R1"]);
+  const v = s.vistaCombate("luis@test.es");
+  assert.equal(v.fase, "combate");
+  assert.equal(v.yo.equipo.length, 3);
+  assert.equal(v.ausencias, 1);
+  assert.equal(s.vistaCombate("ana@test.es").ausencias, 0);
+});
+
+test("RF-32: si se acaba el tiempo del turno, el servidor actúa por quien falta y el turno se resuelve", () => {
+  const { s, reloj } = duelo();
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  s.elegirEquipo("luis@test.es", ["voltarda", "rocadonte", "ciclonia"]);
+  s.elegirAccion("ana@test.es", { tipo: "atacar", movimiento: "llamarada" });
+  reloj.t = 45000;
+  s.vencerPlazos();
+  const v = s.vistaCombate("ana@test.es");
+  assert.equal(v.turno, 2, "el turno se ha resuelto");
+  assert.ok(v.eventos.some((e) => e.quien === "rival"), "el rival ha actuado");
+  // Empieza un plazo nuevo para el turno 2.
+  assert.equal(v.plazoMs, 45000);
+});
+
+test("RF-32: quien deja pasar tres plazos seguidos pierde por inactividad", () => {
+  const terminadas = [];
+  const reloj = { t: 0 };
+  const s = new Salas({ generarId: () => "R1", ahora: () => reloj.t, aleatorio: () => 0.5, alTerminar: (r) => terminadas.push(r) });
+  s.crearPartida(ana);
+  s.unirse("R1", luis);
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  reloj.t += 60000;
+  s.vencerPlazos(); // 1: equipo de Luis
+  for (let i = 0; i < 2; i++) {
+    s.elegirAccion("ana@test.es", { tipo: "cambiar", indice: s.vistaCombate("ana@test.es").yo.activa === 0 ? 1 : 0 });
+    reloj.t += 45000;
+    s.vencerPlazos(); // 2 y 3
+  }
+  const v = s.vistaCombate("ana@test.es");
+  assert.equal(v.fase, "terminada");
+  assert.equal(v.ganador, "yo");
+  assert.equal(v.motivo, "inactividad");
+  assert.equal(terminadas[0].motivo, "inactividad");
+});
+
+test("RF-32: decidir a tiempo vuelve a poner a cero las ausencias", () => {
+  const { s, reloj } = duelo();
+  s.elegirEquipo("ana@test.es", ["pirolince", "marejon", "musgolem"]);
+  reloj.t = 60000;
+  s.vencerPlazos();
+  assert.equal(s.vistaCombate("luis@test.es").ausencias, 1);
+  s.elegirAccion("luis@test.es", { tipo: "atacar", movimiento: s.vistaCombate("luis@test.es").yo.equipo[0].movimientos[0].id });
+  assert.equal(s.vistaCombate("luis@test.es").ausencias, 0);
+});
+
+test("RF-32: contra el Autómata el plazo solo corre para la persona", () => {
+  const { s, reloj } = salasConReloj();
+  s.crearPartidaContraMaquina(ana);
+  reloj.t = 60000;
+  s.vencerPlazos();
+  const v = s.vistaCombate("ana@test.es");
+  assert.equal(v.fase, "combate");
+  assert.equal(v.ausencias, 1);
+});

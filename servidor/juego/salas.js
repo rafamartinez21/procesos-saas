@@ -26,6 +26,12 @@ function limpiarTexto(texto) {
 }
 
 const JUGADORES_POR_PARTIDA = 2;
+
+// RF-32: tiempo para decidir. Si se acaba, el servidor elige por el jugador (con la misma
+// lógica que el Autómata) y, a la tercera vez seguida, el jugador pierde por inactividad.
+const PLAZO_EQUIPO_MS = 60 * 1000;
+const PLAZO_TURNO_MS = 45 * 1000;
+const AUSENCIAS_PARA_PERDER = 3;
 const ESTADO_ABIERTA = "abierta"; // esperando rival
 const ESTADO_COMPLETA = "completa"; // ya hay dos jugadores: se está combatiendo
 const ESTADO_TERMINADA = "terminada"; // el combate ha acabado; los jugadores aún no han salido
@@ -66,7 +72,14 @@ function vistaPublica(partida) {
 // aleatorio: se pasa a cada combate (las pruebas lo fijan).
 // alTerminar(resultado): se llama una vez por combate terminado con
 //   { id, jugadores: [{email, nombre}] , ganador: email|null, motivo, turnos }.
-function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatorio = Math.random, alTerminar = () => {} } = {}) {
+function Salas({
+  generarId = codigoAleatorio,
+  ahora = () => Date.now(),
+  aleatorio = Math.random,
+  alTerminar = () => {},
+  plazoEquipoMs = PLAZO_EQUIPO_MS,
+  plazoTurnoMs = PLAZO_TURNO_MS,
+} = {}) {
   const partidas = new Map(); // id -> { id, estado, jugadores: [{email, nombre}], creada, combate, participantes, espectadores }
   const observando = new Map(); // email del espectador -> id de la partida (RF-23)
 
@@ -136,6 +149,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
       partida.estado = ESTADO_COMPLETA;
       partida.participantes = partida.jugadores.map((x) => ({ ...x }));
       partida.combate = new Combate(partida.participantes.map((x) => x.email), { aleatorio });
+      actualizarPlazo(partida);
     }
     return vistaPublica(partida);
   };
@@ -154,6 +168,41 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
         turnos: partida.combate.turno,
       });
     }
+  };
+
+  // ---------- RF-32: plazos para decidir ----------
+
+  // Quién debe decidir ahora en un combate (emails humanos): en la elección de equipo, quien
+  // aún no lo tiene; en el combate, quien debe sacar otra criatura o, si nadie, quien aún no
+  // ha elegido acción.
+  const pendientesDe = (partida) => {
+    const c = partida.combate;
+    if (!c || c.fase === FASE_TERMINADA) return [];
+    const humanos = partida.participantes.map((j) => j.email).filter((e) => !esMaquina(e));
+    const vistas = humanos.map((e) => [e, c.vista(e)]);
+    if (c.fase === "seleccion") return vistas.filter(([, v]) => !v.yo.equipo).map(([e]) => e);
+    if (vistas.some(([, v]) => v.yo.debeCambiar || v.rival.debeCambiar)) return vistas.filter(([, v]) => v.yo.debeCambiar).map(([e]) => e);
+    return vistas.filter(([, v]) => !v.yo.eleccionHecha).map(([e]) => e);
+  };
+
+  // Cada vez que se abre una decisión nueva (empieza la elección, se resuelve un turno o un
+  // cambio obligado), el plazo vuelve a empezar.
+  const actualizarPlazo = (partida) => {
+    const c = partida.combate;
+    if (!c || c.fase === FASE_TERMINADA) {
+      partida.plazo = null;
+      return;
+    }
+    const firma = `${c.fase}|${c.turno}|${c.cronica.length}`;
+    if (firma !== partida.firmaPlazo) {
+      partida.firmaPlazo = firma;
+      partida.plazo = ahora() + (c.fase === "seleccion" ? plazoEquipoMs : plazoTurnoMs);
+    }
+  };
+
+  // Quien decide por sí mismo vuelve a contar desde cero.
+  const presente = (partida, email) => {
+    if (partida.ausencias) partida.ausencias[email] = 0;
   };
 
   // La máquina actúa en cuanto le toca, con la misma vista que tendría un jugador (D-25).
@@ -183,6 +232,7 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
     partida.combate = new Combate([j.email, maquina.email], { aleatorio });
     partidas.set(id, partida);
     jugarMaquina(partida);
+    actualizarPlazo(partida);
     return vistaPublica(partida);
   };
 
@@ -197,22 +247,63 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   this.elegirEquipo = function (email, ids) {
     const partida = combateDe(email);
     partida.combate.elegirEquipo(email, ids);
+    presente(partida, email);
     jugarMaquina(partida);
+    actualizarPlazo(partida);
     return partida.id;
   };
 
   this.elegirAccion = function (email, accion) {
     const partida = combateDe(email);
     partida.combate.elegirAccion(email, accion);
+    presente(partida, email);
     comprobarFinal(partida);
     if (partida.combate.fase !== FASE_TERMINADA) jugarMaquina(partida);
+    actualizarPlazo(partida);
     return partida.id;
   };
 
+  // RF-32: decide por quien se ha quedado sin tiempo. La capa de tiempo real lo llama cada
+  // segundo. Devuelve los ids de las partidas que han cambiado, para avisar a sus jugadores.
+  this.vencerPlazos = function () {
+    const cambiadas = [];
+    for (const partida of partidas.values()) {
+      if (partida.estado !== ESTADO_COMPLETA || !partida.plazo || ahora() < partida.plazo) continue;
+      const c = partida.combate;
+      partida.ausencias = partida.ausencias || {};
+      for (const email of pendientesDe(partida)) {
+        if (c.fase === FASE_TERMINADA) break;
+        partida.ausencias[email] = (partida.ausencias[email] || 0) + 1;
+        if (partida.ausencias[email] >= AUSENCIAS_PARA_PERDER) {
+          c.abandonar(email, "inactividad");
+          break;
+        }
+        if (c.fase === "seleccion") c.elegirEquipo(email, elegirEquipoIA(aleatorio));
+        else {
+          const accion = elegirAccionIA(c.vista(email), aleatorio);
+          if (accion) c.elegirAccion(email, accion);
+        }
+      }
+      comprobarFinal(partida);
+      if (c.fase !== FASE_TERMINADA) jugarMaquina(partida);
+      // Si nada ha cambiado el estado (no debería), el plazo vuelve a empezar igualmente.
+      partida.firmaPlazo = null;
+      actualizarPlazo(partida);
+      cambiadas.push(partida.id);
+    }
+    return cambiadas;
+  };
+
   // Lo que ve un jugador de su combate, o null si su partida aún no tiene combate.
+  // plazoMs (RF-32): tiempo que le queda para decidir, o null si ahora no le toca.
   this.vistaCombate = function (email) {
     const partida = buscarDe(email);
-    return partida && partida.combate ? partida.combate.vista(email) : null;
+    if (!partida || !partida.combate) return null;
+    const vista = partida.combate.vista(email);
+    const leToca = partida.plazo && partida.estado === ESTADO_COMPLETA && pendientesDe(partida).includes(email);
+    vista.plazoMs = leToca ? Math.max(0, partida.plazo - ahora()) : null;
+    vista.ausencias = (partida.ausencias && partida.ausencias[email]) || 0;
+    return vista;
   };
 
   // RF-22: mensaje en el chat de la partida del jugador. Devuelve { id, mensaje } para que
@@ -326,4 +417,4 @@ function Salas({ generarId = codigoAleatorio, ahora = () => Date.now(), aleatori
   };
 }
 
-module.exports = { Salas, esMaquina, NOMBRE_MAQUINA, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };
+module.exports = { Salas, PLAZO_EQUIPO_MS, PLAZO_TURNO_MS, AUSENCIAS_PARA_PERDER, esMaquina, NOMBRE_MAQUINA, vistaPublica, codigoAleatorio, JUGADORES_POR_PARTIDA, ESTADO_ABIERTA, ESTADO_COMPLETA, ESTADO_TERMINADA };

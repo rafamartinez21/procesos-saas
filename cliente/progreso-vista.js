@@ -35,7 +35,7 @@ function listaHistorial(partidas) {
         "li",
         { class: `res-${p.resultado}` },
         el("span", { class: "marca-res", "aria-hidden": "true" }),
-        el("span", {}, `${RESULTADO[p.resultado]} contra ${p.rival}`, el("small", {}, `${fecha(p.fecha)} · ${p.turnos} turnos${p.motivo === "abandono" ? " · abandono" : ""}`)),
+        el("span", {}, `${RESULTADO[p.resultado]} contra ${p.rival}`, el("small", {}, `${fecha(p.fecha)} · ${p.turnos} turnos${p.motivo === "abandono" ? " · abandono" : p.motivo === "inactividad" ? " · inactividad" : ""}`)),
         el("span", { class: `cambio-elo ${p.cambioElo > 0 ? "sube" : p.cambioElo < 0 ? "baja" : ""}`, title: `ELO tras la partida: ${p.elo}` }, conSigno(p.cambioElo))
       )
     )

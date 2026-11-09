@@ -315,13 +315,13 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     this.eventos = eventos;
   };
 
-  // ---------- RF-18: abandono ----------
-  this.abandonar = function (email) {
+  // ---------- RF-18: abandono (y RF-32: derrota por inactividad) ----------
+  this.abandonar = function (email, motivo = "abandono") {
     exigirJugador(email);
     if (this.fase === FASE_TERMINADA) return;
     this.fase = FASE_TERMINADA;
     this.ganador = rivalDe(email);
-    this.motivo = "abandono";
+    this.motivo = motivo;
     this.eventos = [{ tipo: "fin", ganador: this.ganador, motivo: this.motivo }];
     anotar(this.turno, this.eventos);
   };

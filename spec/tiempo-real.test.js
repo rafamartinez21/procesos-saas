@@ -407,3 +407,33 @@ test("RF-24: al conectarse sin partida ni nada que mirar, el cliente recibe los 
   assert.equal(partida, null);
   assert.equal(espectador, null);
 });
+
+// ---------- RF-32: tiempo límite ----------
+
+test("RF-32: al acabarse el plazo el servidor elige por quien falta y avisa a los dos", async () => {
+  // Servidor propio con plazos muy cortos.
+  await new Promise((resolve) => io.close(resolve));
+  salas = new Salas({ plazoEquipoMs: 150, plazoTurnoMs: 150 });
+  servidor = http.createServer(crearApp(sistema, { sesiones, registro: registroSilencioso }));
+  io = conectarTiempoReal(servidor, { sistema, salas, sesiones, registro: registroSilencioso, esperaReconexionMs: 50, intervaloPlazosMs: 20 });
+  await new Promise((resolve) => servidor.listen(0, resolve));
+  base = `http://127.0.0.1:${servidor.address().port}`;
+
+  const ana = await clienteDe("ana@test.es");
+  const luis = await clienteDe("luis@test.es");
+  await Promise.all([listo(ana), listo(luis)]);
+  const { partida } = await emitir(ana, "partida:crear");
+  const enSeleccion = esperarQue(ana, "combate:estado", (v) => v.fase === "seleccion");
+  await emitir(luis, "partida:unirse", { id: partida.id });
+  const v0 = await enSeleccion;
+  assert.ok(v0.plazoMs > 0 && v0.plazoMs <= 150, "la vista trae el tiempo que queda");
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "marejon", "musgolem"] });
+  // Luis no elige: al vencer el plazo, el servidor le pone un equipo y empieza el combate.
+  const [deAna, deLuis] = await Promise.all([
+    esperarQue(ana, "combate:estado", (v) => v.fase === "combate"),
+    esperarQue(luis, "combate:estado", (v) => v.fase === "combate"),
+  ]);
+  assert.equal(deLuis.yo.equipo.length, 3);
+  assert.equal(deLuis.ausencias, 1);
+  assert.equal(deAna.ausencias, 0);
+});

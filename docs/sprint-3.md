@@ -41,7 +41,7 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 |---|---|---|---|
 | RF-30 | Golpes críticos | 1 h | hecho |
 | RF-31 | Movimientos de apoyo que suben o bajan estadísticas | 5 h | hecho |
-| RF-32 | Tiempo límite por turno: si no se elige, el servidor elige; tres turnos seguidos sin elegir pierden el combate | 5 h | pendiente |
+| RF-32 | Tiempo límite por turno: si no se elige, el servidor elige; tres turnos seguidos sin elegir pierden el combate | 5 h | hecho |
 
 ### Hito 11: encontrar partida
 
@@ -72,6 +72,15 @@ Igual que en el Sprint 2:
   - crónica completa del combate.
 - **PR y etiqueta:** [PR #34](https://github.com/rafamartinez21/procesos-saas/pull/34) (plan), [PR #35](https://github.com/rafamartinez21/procesos-saas/pull/35) a [PR #38](https://github.com/rafamartinez21/procesos-saas/pull/38). Etiqueta `hito-9`.
 - **Cómo se comprobó:** además de las pruebas automáticas, cada pantalla se revisó en el navegador con dos cuentas locales, en escritorio y a 375 px de ancho, jugando contra el Autómata y recargando en mitad del combate.
+
+### Hito 10: más estrategia
+
+- **Qué se hizo:**
+  - golpes críticos (1/16, daño x1,5);
+  - seis movimientos de apoyo y etapas de estadísticas de -2 a +2 que se pierden al cambiar (D-30); el Autómata los usa cuando le convienen;
+  - tiempo límite para decidir, con elección automática del servidor y derrota por inactividad a la tercera vez seguida (D-31).
+- **PR y etiqueta:** [PR #39](https://github.com/rafamartinez21/procesos-saas/pull/39) a [PR #41](https://github.com/rafamartinez21/procesos-saas/pull/41). Etiqueta `hito-10`.
+- **Desviaciones:** la tirada de crítico se añadió después de la variación de daño, así que hubo que ajustar las secuencias de azar de cuatro pruebas de estados del Sprint 2. No cambió lo que comprueban.
 
 ## Retrospectiva
 
