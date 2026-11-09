@@ -41,7 +41,10 @@ const salaDeEspectadores = (id) => `espectadores:${id}`;
 // tiempo máximo de una petición: Socket.IO se vuelve a conectar solo en ese margen.
 const ESPERA_RECONEXION_MS = 30 * 1000;
 
-function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro = crearRegistro(), esperaReconexionMs = ESPERA_RECONEXION_MS }) {
+// RF-32: cada cuánto se comprueban los plazos para decidir.
+const INTERVALO_PLAZOS_MS = 1000;
+
+function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro = crearRegistro(), esperaReconexionMs = ESPERA_RECONEXION_MS, intervaloPlazosMs = INTERVALO_PLAZOS_MS }) {
   const io = new Server(servidorHttp, {
     // Mismo origen que la página: no se abre CORS a otros sitios.
     cors: { origin: false },
@@ -95,6 +98,22 @@ function conectarTiempoReal(servidorHttp, { sistema, salas, sesiones, registro =
     const vista = salas.vistaEspectador(id);
     if (vista) io.to(salaDeEspectadores(id)).emit("espectador:estado", vista);
   };
+
+  // RF-32: si a alguien se le acaba el tiempo, el servidor decide por él y avisa a todos.
+  const revisarPlazos = setInterval(() => {
+    try {
+      const cambiadas = salas.vencerPlazos();
+      for (const id of cambiadas) {
+        registro.info("plazo vencido", { partida: id });
+        avisarPartida(id);
+      }
+      if (cambiadas.length) difundirLista();
+    } catch (err) {
+      registro.error("error al revisar plazos", { error: String((err && err.stack) || err) });
+    }
+  }, intervaloPlazosMs);
+  revisarPlazos.unref();
+  servidorHttp.on("close", () => clearInterval(revisarPlazos));
 
   io.on("connection", (socket) => {
     const { email } = socket.data.jugador;

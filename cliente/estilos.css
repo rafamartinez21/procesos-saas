@@ -607,3 +607,15 @@ td.acciones { display: flex; gap: 6px; }
 .flotante.sube { color: var(--oro-claro); font-size: 1.15rem; }
 .flotante.baja { color: #91a7ff; font-size: 1.15rem; }
 
+/* ---------- tiempo para decidir (RF-32) ---------- */
+.fila-pregunta { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.reloj { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: rgba(5, 7, 20, 0.5); border: 1px solid var(--linea); font-weight: 700; font-variant-numeric: tabular-nums; }
+.reloj[hidden] { display: none; }
+.reloj-barra { width: 70px; height: 6px; border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.reloj-relleno { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--eter), var(--oro)); transition: width 0.25s linear; }
+.reloj.urgente { color: #ffa8a8; border-color: rgba(255, 107, 107, 0.6); animation: urgente 1s ease-in-out infinite; }
+.reloj.urgente .reloj-relleno { background: var(--peligro); }
+@keyframes urgente { 50% { box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.18); } }
+.aviso-ausencias { margin: 0; font-size: 0.85rem; color: var(--aviso); background: rgba(252, 196, 25, 0.08); border: 1px solid rgba(252, 196, 25, 0.3); padding: 8px 12px; border-radius: var(--radio-sm); }
+.bandeja .reloj { order: -1; }
+

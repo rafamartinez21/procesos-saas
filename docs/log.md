@@ -4,6 +4,10 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-09 | Etiqueta `hito-10` | [hito-10](https://github.com/rafamartinez21/procesos-saas/tree/hito-10) |
+| 2026-11-09 | RF-32: tiempo límite por turno y derrota por inactividad (D-31) | [PR #41](https://github.com/rafamartinez21/procesos-saas/pull/41) |
+| 2026-11-09 | RF-31: movimientos de apoyo y etapas de estadísticas (D-30) | [PR #40](https://github.com/rafamartinez21/procesos-saas/pull/40) |
+| 2026-11-09 | RF-30: golpes críticos | [PR #39](https://github.com/rafamartinez21/procesos-saas/pull/39) |
 | 2026-11-09 | Etiqueta `hito-9` | [hito-9](https://github.com/rafamartinez21/procesos-saas/tree/hito-9) |
 | 2026-11-09 | RF-29: crónica completa del combate | [PR #38](https://github.com/rafamartinez21/procesos-saas/pull/38) |
 | 2026-11-09 | RF-28: arena de combate con el turno animado (D-29) | [PR #37](https://github.com/rafamartinez21/procesos-saas/pull/37) |
