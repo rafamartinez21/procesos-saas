@@ -463,6 +463,11 @@ export function iconoElemento(elemento, { color = "currentColor", clase = "icono
   return s("svg", { viewBox: "0 0 24 24", class: clase, "aria-hidden": "true" }, ...dibujo);
 }
 
+// Icono del modo cine de la arena (las cuatro esquinas de la pantalla completa).
+export function iconoPantallaCompleta({ clase = "icono" } = {}) {
+  return s("svg", { viewBox: "0 0 24 24", class: clase, "aria-hidden": "true" }, linea("M4 9 V4 H9 M15 4 H20 V9 M20 15 V20 H15 M9 20 H4 V15", "currentColor", 2.4));
+}
+
 // Emblema del juego: un cristal de éter dentro de un anillo.
 export function emblema({ clase = "emblema" } = {}) {
   const n = ++contador;

@@ -709,6 +709,7 @@ button.latiendo { animation: latir 1.2s ease-in-out infinite; }
   background: rgba(5, 7, 20, 0.6); color: var(--texto); border: 1px solid var(--linea); box-shadow: none;
 }
 .arena-boton:hover:not([disabled]) { background: rgba(242, 201, 109, 0.2); box-shadow: none; }
+.arena-boton .icono { width: 16px; height: 16px; display: block; margin: auto; }
 
 /* Rótulo central de turno, inicio y golpes críticos. */
 .arena-rotulo {

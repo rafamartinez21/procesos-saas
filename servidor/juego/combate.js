@@ -15,14 +15,6 @@ const { ErrorNegocio } = require("../modelo.js");
 const { obtenerCriatura, obtenerMovimiento, eficacia, ETAPA_MAXIMA, multiplicadorEtapa, ASPECTOS, ASPECTO_POR_DEFECTO, ELEMENTOS } = require("./criaturas.js");
 
 const TAMANO_EQUIPO = 3;
-
-// RF-36: paraje donde se libra el combate (uno por elemento). Sale de las dos criaturas que
-// abren el combate, sin usar el azar (así no cambia la secuencia de números del combate):
-// es el mismo para los dos jugadores y para el público, y no cambia al recargar.
-function escenarioPara(ids) {
-  const suma = ids.join("|").split("").reduce((t, c) => t + c.charCodeAt(0), 0);
-  return ELEMENTOS[suma % ELEMENTOS.length];
-}
 const BONO_MISMO_ELEMENTO = 1.25; // un movimiento del elemento de la criatura pega más
 const PROB_DESCONGELAR = 0.3;
 const PROB_PARALISIS = 0.25;
@@ -32,6 +24,14 @@ const FASE_SELECCION = "seleccion";
 const FASE_COMBATE = "combate";
 const FASE_TERMINADA = "terminada";
 const MAX_CRONICA = 200;
+
+// RF-36: paraje donde se libra el combate (uno por elemento). Sale de las dos criaturas que
+// abren el combate, sin usar el azar (así no cambia la secuencia de números del combate):
+// es el mismo para los dos jugadores y para el público, y no cambia al recargar.
+function escenarioPara(ids) {
+  const suma = ids.join("|").split("").reduce((t, c) => t + c.charCodeAt(0), 0);
+  return ELEMENTOS[suma % ELEMENTOS.length];
+}
 
 // Fórmula de daño. Se exporta para probarla aparte.
 //   base = potencia * ataque / defensa / 3 + 2

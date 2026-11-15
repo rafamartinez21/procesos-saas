@@ -14,7 +14,7 @@
 // paso se aplica al momento y solo se ve la narración.
 
 import { el } from "./dom.js";
-import { retrato, iconoElemento } from "./retratos.js";
+import { retrato, iconoElemento, iconoPantallaCompleta } from "./retratos.js";
 import { escenario, biomaDe, BIOMAS } from "./escenarios.js";
 import { crearEfectos } from "./efectos.js";
 
@@ -57,7 +57,7 @@ function crearLado(posicion) {
 function botonCine(objetivo) {
   const puede = typeof document !== "undefined" && document.fullscreenEnabled;
   if (!puede) return null;
-  const boton = el("button", { type: "button", class: "arena-boton", "aria-label": "Modo cine (pantalla completa)", title: "Modo cine" }, "⛶");
+  const boton = el("button", { type: "button", class: "arena-boton", "aria-label": "Modo cine (pantalla completa)", title: "Modo cine" }, iconoPantallaCompleta());
   boton.onclick = () => {
     const destino = objetivo() || boton.closest(".arena");
     if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
