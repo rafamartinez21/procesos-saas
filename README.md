@@ -1,8 +1,8 @@
 # Ecos de Aetheria — Procesos de Ingeniería del Software
 
-Aplicación web tipo SaaS organizada en capas: gestión de usuarios (Sprint 1) y el juego multijugador en tiempo real **Ecos de Aetheria** (Sprint 2), duelos por turnos entre criaturas elementales originales.
+Aplicación web tipo SaaS organizada en capas: gestión de usuarios (Sprint 1) y el juego multijugador en tiempo real **Ecos de Aetheria** (Sprints 2 y 3), duelos por turnos entre criaturas elementales originales.
 
-**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 completo (hitos 5 a 8): salas de partida en tiempo real, combate por turnos, historial con ranking ELO y estadísticas, rival máquina, chat, modo espectador y reconexión. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Documentación del proyecto en [docs/](docs/index.md).
+**Estado:** Sprint 1 completo (hitos 1 a 4): arquitectura en capas, registro e inicio de sesión locales con hash, confirmación de cuenta por correo (Brevo), inicio de sesión con Google (OAuth), sesión persistente en MongoDB, roles usuario/administrador aplicados en el servidor, registro de actividad, CI y despliegue continuo. Sprint 2 completo (hitos 5 a 8): salas de partida en tiempo real, combate por turnos, historial con ranking ELO y estadísticas, rival máquina, chat, modo espectador y reconexión. Plan y requisitos en [docs/sprint-2.md](docs/sprint-2.md). Sprint 3 en curso, con los hitos 9 a 12 hechos: interfaz propia del juego, retratos de las criaturas con aspectos a elegir, arena animada con un paraje por elemento, crónica del combate, golpes críticos, movimientos de apoyo, tiempo límite por turno, duelo rápido por ELO, revancha y público en directo. Plan y requisitos en [docs/sprint-3.md](docs/sprint-3.md). Documentación del proyecto en [docs/](docs/index.md).
 
 - URL pública: https://procesos-saas-580225401181.europe-west1.run.app
 
@@ -34,6 +34,10 @@ cliente/                  Frontend (se sirve desde el mismo origen que la API)
   cliente-api.js          Cliente de comunicación: único sitio que habla con la API REST (fetch).
   cliente-juego.js        Cliente de tiempo real: único sitio que usa Socket.IO.
   combate-vista.js        Presentación del combate: dibuja la vista que envía el servidor.
+  arena.js                Arena del combate: reproduce cada turno paso a paso con los datos de los eventos.
+  escenarios.js           Los seis parajes de la arena (uno por elemento), dibujados en SVG.
+  efectos.js              Partículas de la arena en un canvas: ambiente, proyectiles, impactos y estados.
+  retratos.js             Retratos SVG de las doce criaturas, sus aspectos y los iconos de elemento.
   progreso-vista.js       Presentación del progreso: estadísticas, últimas partidas y ranking.
   dom.js                  Utilidad de dibujo (crea elementos con textContent).
   estilos.css
@@ -84,7 +88,7 @@ Abre http://localhost:3000.
 npm test
 ```
 
-Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de la capa de acceso a datos y de las sesiones (en memoria y en MongoDB con una base de datos temporal), de la confirmación de cuenta (token válido, inventado, caducado y reutilizado), de la API (rutas protegidas) y del registro de actividad. No necesitan red ni secretos.
+Ejecuta las pruebas de la lógica (usuarios, roles, login), del hash de contraseñas, de la capa de acceso a datos y de las sesiones (en memoria y en MongoDB con una base de datos temporal), de la confirmación de cuenta (token válido, inventado, caducado y reutilizado), de la API (rutas protegidas) y del registro de actividad. También las del juego: catálogo de criaturas, motor de combate (con el azar controlado), rival máquina, salas (plazos, emparejamiento y revancha con un reloj inyectado), progreso y ranking, la capa de tiempo real con clientes Socket.IO de verdad y los retratos de las criaturas. No necesitan red ni secretos.
 
 ## Variables de entorno
 
@@ -134,10 +138,10 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 ## Partidas en tiempo real (hito 5)
 
 - Con la sesión iniciada, la página se conecta por Socket.IO usando la misma cookie de sesión; sin sesión válida el servidor rechaza la conexión, y comprueba la sesión de nuevo en cada acción.
-- «Crear partida» genera un código corto (por ejemplo `K7Q2X`); la lista de partidas abiertas se actualiza en directo en todas las pantallas; se entra con «Unirse» o escribiendo el código.
+- «Crear sala» genera un código corto (por ejemplo `K7Q2X`); la lista de «Salas abiertas» se actualiza en directo en todas las pantallas; se entra desde la lista o escribiendo el código en «Unirse con código».
 - Si un jugador abandona, el otro recibe un aviso y la partida vuelve a estar abierta. Si se pierde la conexión (recargar, corte de red), hay 30 segundos para volver antes de salir de la partida (RF-24). La página se reconecta sola, avisa mientras tanto y, al volver, recupera la partida, el combate y el chat. Si se vuelve tarde, se ha perdido la partida y la página lo indica.
 - A los demás jugadores solo se les muestra el nombre, nunca el email.
-- Modo espectador (RF-23): «Combates en curso» lista las partidas que se están jugando y «Mirar» las sigue turno a turno. Se ven las dos criaturas en combate y el chat, pero no el banquillo ni la acción elegida de nadie (D-26).
+- Modo espectador (RF-23): «Combates en directo» lista las partidas que se están jugando y «Mirar» las sigue turno a turno. Se ven las dos criaturas en combate y el chat, pero no el banquillo ni la acción elegida de nadie (D-26).
 - Chat dentro de la partida (RF-22): mensajes de hasta 200 caracteres, como mucho 5 cada 10 segundos, mostrados siempre como texto. Al reconectarse se recuperan los últimos 50.
 
 ## Cómo se juega (hito 6)
@@ -146,7 +150,7 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 2. En cada turno los dos eligen a la vez y en secreto: atacar con uno de los movimientos de su criatura o cambiarla por otra del equipo. Los cambios van primero y los ataques, de la criatura más rápida a la más lenta.
 3. El daño depende de la potencia del movimiento, del ataque y la defensa, de si el movimiento es del elemento de la criatura (x1,25) y de la eficacia: cada elemento es muy eficaz (x2) contra dos y poco eficaz (x0,5) contra otros dos. Algunos movimientos queman, congelan o paralizan, y Drenaje cura al atacante.
 4. Si cae una criatura, su dueño saca otra. Gana quien deja al rival sin criaturas; rendirse o abandonar da la victoria al rival.
-5. Para jugar solo, «Jugar contra la máquina» empieza una partida contra el Autómata de Aetheria. Elige el movimiento más eficaz y cambia de criatura cuando le conviene, pero solo con la información que tendría un jugador (D-25). Estas partidas no cuentan para el ranking.
+5. Para jugar solo, «Desafiar al Autómata» empieza una partida contra el Autómata de Aetheria. Elige el movimiento más eficaz y cambia de criatura cuando le conviene, pero solo con la información que tendría un jugador (D-25). Estas partidas no cuentan para el ranking.
 
 Todo se calcula en el servidor; el navegador solo envía la acción elegida y nunca recibe la del rival antes de resolver el turno.
 
@@ -155,6 +159,15 @@ Todo se calcula en el servidor; el navegador solo envía la acción elegida y nu
 - Cada combate terminado se guarda en MongoDB (colección `partidas`) con los dos jugadores, el ganador, el motivo, los turnos y la puntuación de antes y de después.
 - Ranking ELO (D-24): todos empiezan con 1000; ganar a alguien mejor da más puntos. Abandonar cuenta como derrota.
 - El panel «Tu progreso» muestra tu ELO, partidas, porcentaje de victorias, racha, tus últimas partidas y el ranking, y se actualiza solo al terminar cada combate. A otros jugadores solo se les muestra tu nombre.
+
+## Novedades del Sprint 3 (hitos 9 a 12)
+
+- **Interfaz propia** (hito 9): tema de Aetheria en todo el juego, retratos originales de las doce criaturas, arena con cada turno animado paso a paso y crónica completa del combate. Sin animaciones si el sistema pide reducir el movimiento.
+- **Más estrategia** (hito 10): golpes críticos (1/16, daño x1,5), seis movimientos de apoyo que suben o bajan ataque, defensa y velocidad (etapas de -2 a +2 que se pierden al cambiar de criatura) y tiempo límite: 60 s para elegir equipo y 45 s por turno. Si no eliges, el servidor elige por ti; a la tercera vez seguida pierdes el combate.
+- **Encontrar partida** (hito 11): «Duelo rápido» empareja con un rival de ELO parecido (margen de ±100 que crece con la espera hasta ±400) y, al terminar, se puede pedir la revancha en la misma partida.
+- **Un combate que se vea bien** (hito 12): las criaturas tienen volumen y tres aspectos a elegir (normal, astral y sombra) que no cambian sus estadísticas; el combate se libra en uno de seis parajes, con su ambiente, proyectiles y partículas de cada elemento; la arena y los movimientos se ven a la vez en portátil y en móvil, y los jugadores ven cuánta gente mira su combate en directo.
+
+Las reglas siguen en el servidor: el navegador recibe en cada evento los datos para animarlo y solo los dibuja.
 
 ## Limitaciones conocidas
 
