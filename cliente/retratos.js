@@ -5,6 +5,10 @@
 // innerHTML.
 //
 // Cada criatura mira hacia la derecha. En la arena, la del rival se dibuja en espejo.
+//
+// Hito 12 (RF-35): los dibujos llevan volumen (contorno, sombra propia y luz de borde con un
+// filtro SVG), los ojos parpadean y cada criatura puede tener un aspecto: normal, astral o
+// sombra. El aspecto solo cambia el dibujo; lo elige el jugador y lo guarda el servidor.
 
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -37,7 +41,7 @@ const OSCURO = "#1b1b2f";
 function ojo(x, y, r = 3.5, mira = 0.8) {
   return s(
     "g",
-    {},
+    { class: "ojo" },
     s("ellipse", { cx: x, cy: y, rx: r, ry: r * 1.12, fill: "#fff" }),
     s("circle", { cx: x + mira, cy: y + 0.3, r: r * 0.62, fill: OSCURO }),
     s("circle", { cx: x + mira + r * 0.25, cy: y - r * 0.3, r: r * 0.24, fill: "#fff" })
@@ -46,7 +50,8 @@ function ojo(x, y, r = 3.5, mira = 0.8) {
 
 const linea = (d, color, ancho, extra = {}) => s("path", { d, fill: "none", stroke: color, "stroke-width": ancho, "stroke-linecap": "round", "stroke-linejoin": "round", ...extra });
 const forma = (d, color, extra = {}) => s("path", { d, fill: color, ...extra });
-const sombra = (rx = 34) => s("ellipse", { cx: 60, cy: 103, rx, ry: 5.5, fill: "rgba(0,0,0,0.28)" });
+// La sombra del suelo va aparte del cuerpo: no lleva contorno ni cambia con el aspecto.
+const sombra = (rx = 34) => s("ellipse", { class: "suelo", cx: 60, cy: 103, rx, ry: 5.5, fill: "rgba(0,0,0,0.28)" });
 
 // ---------- las doce criaturas ----------
 
@@ -305,33 +310,140 @@ export const tieneDibujo = (id) => Object.hasOwn(DIBUJOS, id);
 // Silueta genérica para una criatura que no tuviera dibujo (no debería pasar).
 const generico = (p) => [sombra(30), s("ellipse", { cx: 60, cy: 70, rx: 28, ry: 24, fill: p.base }), ojo(68, 62, 4), ojo(52, 62, 4)];
 
-// Retrato de una criatura. Opciones:
-//   elemento: para elegir la paleta; espejo: mirar a la izquierda (rival);
-//   fondo: disco de color detrás (tarjetas); titulo: texto accesible.
-export function retrato(id, { elemento = "neutro", espejo = false, fondo = false, titulo, clase = "retrato" } = {}) {
-  const p = PALETA_CRIATURA[id] || PALETA[elemento] || PALETA.neutro;
-  const n = ++contador;
-  const hijos = [];
-  if (fondo) {
-    hijos.push(
-      s(
-        "defs",
-        {},
-        s(
-          "radialGradient",
-          { id: `fondo-${n}`, cx: "50%", cy: "38%", r: "65%" },
-          s("stop", { offset: "0%", "stop-color": p.claro, "stop-opacity": 0.55 }),
-          s("stop", { offset: "70%", "stop-color": p.base, "stop-opacity": 0.22 }),
-          s("stop", { offset: "100%", "stop-color": p.oscuro, "stop-opacity": 0.05 })
-        )
-      ),
-      s("circle", { cx: 60, cy: 60, r: 58, fill: `url(#fondo-${n})` })
+// ---------- aspectos (RF-35) ----------
+
+export const ASPECTOS = [
+  { id: "normal", nombre: "Normal", descripcion: "Tal como nació en Aetheria." },
+  { id: "astral", nombre: "Astral", descripcion: "Bañada por la luz de las estrellas." },
+  { id: "sombra", nombre: "Sombra", descripcion: "Templada en el lado oscuro del éter." },
+];
+const ID_ASPECTOS = new Set(ASPECTOS.map((a) => a.id));
+
+// Filtro de volumen: contorno oscuro alrededor de la silueta, sombra propia abajo a la
+// derecha y luz de borde arriba a la izquierda. Da a las figuras planas un aire de ilustración.
+function filtroVolumen(id) {
+  return s(
+    "filter",
+    { id, x: "-15%", y: "-15%", width: "130%", height: "130%", "color-interpolation-filters": "sRGB" },
+    s("feMorphology", { in: "SourceAlpha", operator: "dilate", radius: 1.15, result: "grueso" }),
+    s("feFlood", { "flood-color": "#0d0a1f", "flood-opacity": 0.85 }),
+    s("feComposite", { in2: "grueso", operator: "in", result: "borde" }),
+    s("feOffset", { in: "SourceAlpha", dx: -2.6, dy: -3.6 }),
+    s("feGaussianBlur", { stdDeviation: 2.2, result: "arriba" }),
+    s("feComposite", { in: "SourceAlpha", in2: "arriba", operator: "out", result: "zonaSombra" }),
+    s("feFlood", { "flood-color": "#05030f", "flood-opacity": 0.34 }),
+    s("feComposite", { in2: "zonaSombra", operator: "in", result: "sombraPropia" }),
+    s("feOffset", { in: "SourceAlpha", dx: 2, dy: 2.8 }),
+    s("feGaussianBlur", { stdDeviation: 1.6, result: "abajo" }),
+    s("feComposite", { in: "SourceAlpha", in2: "abajo", operator: "out", result: "zonaLuz" }),
+    s("feFlood", { "flood-color": "#ffffff", "flood-opacity": 0.4 }),
+    s("feComposite", { in2: "zonaLuz", operator: "in", result: "luz" }),
+    s("feMerge", {}, s("feMergeNode", { in: "borde" }), s("feMergeNode", { in: "SourceGraphic" }), s("feMergeNode", { in: "sombraPropia" }), s("feMergeNode", { in: "luz" }))
+  );
+}
+
+// Filtro de cada aspecto (se aplica encima del volumen).
+function filtroAspecto(id, aspecto) {
+  if (aspecto === "astral") {
+    // Colores girados hacia los tonos del cielo y un halo celeste.
+    return s(
+      "filter",
+      { id, x: "-25%", y: "-25%", width: "150%", height: "150%", "color-interpolation-filters": "sRGB" },
+      s("feColorMatrix", { in: "SourceGraphic", type: "hueRotate", values: 150, result: "girado" }),
+      s("feColorMatrix", { in: "girado", type: "saturate", values: 1.25, result: "vivo" }),
+      s("feGaussianBlur", { in: "SourceAlpha", stdDeviation: 3.5 }),
+      s("feComponentTransfer", { result: "halo0" }, s("feFuncA", { type: "linear", slope: 0.7 })),
+      s("feFlood", { "flood-color": "#a5f3ff" }),
+      s("feComposite", { in2: "halo0", operator: "in", result: "halo" }),
+      s("feMerge", {}, s("feMergeNode", { in: "halo" }), s("feMergeNode", { in: "vivo" }))
     );
   }
+  // Sombra: los tonos medios se oscurecen (los blancos, como los ojos, siguen brillando),
+  // todo tira a violeta y alrededor hay un aura oscura.
+  return s(
+    "filter",
+    { id, x: "-25%", y: "-25%", width: "150%", height: "150%", "color-interpolation-filters": "sRGB" },
+    s("feColorMatrix", { in: "SourceGraphic", type: "saturate", values: 0.35 }),
+    s(
+      "feComponentTransfer",
+      { result: "oscuro" },
+      s("feFuncR", { type: "gamma", amplitude: 0.85, exponent: 2.3, offset: 0.02 }),
+      s("feFuncG", { type: "gamma", amplitude: 0.6, exponent: 2.5, offset: 0 }),
+      s("feFuncB", { type: "gamma", amplitude: 1.05, exponent: 1.9, offset: 0.06 })
+    ),
+    s("feGaussianBlur", { in: "SourceAlpha", stdDeviation: 4 }),
+    s("feComponentTransfer", { result: "aura0" }, s("feFuncA", { type: "linear", slope: 0.8 })),
+    s("feFlood", { "flood-color": "#8b2cf5" }),
+    s("feComposite", { in2: "aura0", operator: "in", result: "aura" }),
+    s("feMerge", {}, s("feMergeNode", { in: "aura" }), s("feMergeNode", { in: "oscuro" }))
+  );
+}
+
+// Estrella de cuatro puntas (brillos del aspecto astral).
+const estrella = (x, y, r, color, retraso) =>
+  s("path", {
+    class: "brillo",
+    style: `animation-delay:${retraso}s`,
+    d: `M${x} ${y - r} Q${x + r * 0.18} ${y - r * 0.18} ${x + r} ${y} Q${x + r * 0.18} ${y + r * 0.18} ${x} ${y + r} Q${x - r * 0.18} ${y + r * 0.18} ${x - r} ${y} Q${x - r * 0.18} ${y - r * 0.18} ${x} ${y - r} Z`,
+    fill: color,
+  });
+
+function adornos(aspecto) {
+  if (aspecto === "astral") {
+    return [estrella(22, 26, 5, "#fff", 0), estrella(98, 20, 4, "#c3fae8", -0.7), estrella(106, 74, 3.4, "#fff", -1.4), estrella(14, 70, 3, "#d0bfff", -2.1), estrella(60, 12, 3.2, "#fff", -2.8)];
+  }
+  if (aspecto === "sombra") {
+    return [
+      s("ellipse", { class: "humo", cx: 36, cy: 98, rx: 12, ry: 5, fill: "#5f3dc4", opacity: 0.5, style: "animation-delay:0s" }),
+      s("ellipse", { class: "humo", cx: 62, cy: 100, rx: 15, ry: 5.5, fill: "#3b1f7a", opacity: 0.55, style: "animation-delay:-1.1s" }),
+      s("ellipse", { class: "humo", cx: 86, cy: 97, rx: 11, ry: 4.5, fill: "#7048e8", opacity: 0.45, style: "animation-delay:-2.2s" }),
+    ];
+  }
+  return [];
+}
+
+const esSuelo = (nodo) => (nodo.getAttribute ? nodo.getAttribute("class") : nodo.atributos && nodo.atributos.class) === "suelo";
+
+// Retrato de una criatura. Opciones:
+//   elemento: para elegir la paleta; espejo: mirar a la izquierda (rival);
+//   fondo: disco de color detrás (tarjetas); titulo: texto accesible;
+//   aspecto (RF-35): "normal", "astral" o "sombra".
+export function retrato(id, { elemento = "neutro", espejo = false, fondo = false, titulo, clase = "retrato", aspecto = "normal" } = {}) {
+  const p = PALETA_CRIATURA[id] || PALETA[elemento] || PALETA.neutro;
+  const a = ID_ASPECTOS.has(aspecto) ? aspecto : "normal";
+  const n = ++contador;
+  const defs = [filtroVolumen(`volumen-${n}`)];
+  if (a !== "normal") defs.push(filtroAspecto(`aspecto-${n}`, a));
+  const hijos = [];
+  if (fondo) {
+    const fp = a === "astral" ? { claro: "#e5dbff", base: "#748ffc", oscuro: "#3b5bdb" } : a === "sombra" ? { claro: "#9775fa", base: "#5f3dc4", oscuro: "#1b1036" } : p;
+    defs.push(
+      s(
+        "radialGradient",
+        { id: `fondo-${n}`, cx: "50%", cy: "38%", r: "65%" },
+        s("stop", { offset: "0%", "stop-color": fp.claro, "stop-opacity": 0.55 }),
+        s("stop", { offset: "70%", "stop-color": fp.base, "stop-opacity": 0.22 }),
+        s("stop", { offset: "100%", "stop-color": fp.oscuro, "stop-opacity": 0.05 })
+      )
+    );
+    hijos.push(s("circle", { cx: 60, cy: 60, r: 58, fill: `url(#fondo-${n})` }));
+  }
   const dibujo = (DIBUJOS[id] || generico)(p);
-  hijos.push(s("g", espejo ? { transform: "translate(120 0) scale(-1 1)" } : {}, ...dibujo));
-  const atributos = { viewBox: "0 0 120 120", class: clase, role: "img", "aria-label": titulo || id };
-  return s("svg", atributos, titulo ? s("title", {}, titulo) : null, ...hijos);
+  const suelo = dibujo.filter(esSuelo);
+  const resto = dibujo.filter((x) => !esSuelo(x));
+  const cuerpo = s("g", { class: "cuerpo-dibujo", filter: `url(#volumen-${n})` }, ...resto);
+  hijos.push(
+    s(
+      "g",
+      espejo ? { transform: "translate(120 0) scale(-1 1)" } : {},
+      ...suelo,
+      a === "normal" ? cuerpo : s("g", { filter: `url(#aspecto-${n})` }, cuerpo),
+      ...adornos(a)
+    )
+  );
+  // Cada retrato parpadea a su ritmo (--retraso desfasa la animación de los ojos).
+  const atributos = { viewBox: "0 0 120 120", class: `${clase} aspecto-${a}`, role: "img", "aria-label": titulo || id, style: `--retraso:${-((n * 1.7) % 5).toFixed(2)}s` };
+  return s("svg", atributos, titulo ? s("title", {}, titulo) : null, s("defs", {}, ...defs), ...hijos);
 }
 
 // ---------- iconos de elemento ----------

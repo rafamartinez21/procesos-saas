@@ -84,6 +84,11 @@ const CATALOGO = [
 
 const POR_ID = new Map(CATALOGO.map((c) => [c.id, c]));
 
+// RF-35: aspectos (skins) de las criaturas. Solo cambian cómo se dibujan: mismas
+// estadísticas y movimientos. "normal" es el de siempre.
+const ASPECTOS = ["normal", "astral", "sombra"];
+const ASPECTO_POR_DEFECTO = "normal";
+
 function obtenerCriatura(id) {
   return POR_ID.get(id);
 }
@@ -108,6 +113,8 @@ module.exports = {
   MOVIMIENTOS,
   ETAPA_MAXIMA,
   multiplicadorEtapa,
+  ASPECTOS,
+  ASPECTO_POR_DEFECTO,
   CATALOGO,
   eficacia,
   obtenerCriatura,

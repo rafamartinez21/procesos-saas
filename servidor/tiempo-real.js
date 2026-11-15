@@ -11,7 +11,7 @@
 //   partida:crear-maquina    -> RF-25 (partida contra la máquina)
 //   partida:unirse { id }    -> RF-13
 //   partida:abandonar        -> RF-14 (durante el combate, lo pierde: RF-18)
-//   combate:equipo { criaturas: [ids] }               -> RF-16
+//   combate:equipo { criaturas: [ids], aspectos? }    -> RF-16 (RF-35: aspecto de cada una)
 //   combate:accion { tipo: "atacar", movimiento }     -> RF-17
 //   combate:accion { tipo: "cambiar", indice }        -> RF-17
 //   chat:enviar { texto }                             -> RF-22
@@ -108,6 +108,11 @@ function conectarTiempoReal(servidorHttp, {
     avisarCombate(salas.participantesDe(id));
     const vista = salas.vistaEspectador(id);
     if (vista) io.to(salaDeEspectadores(id)).emit("espectador:estado", vista);
+  };
+
+  // RF-37: cuando cambia el público, los jugadores lo ven (si la partida sigue existiendo).
+  const avisarSiExiste = (id) => {
+    if (id && salas.vistaEspectador(id)) avisarPartida(id);
   };
 
   // RF-33: dos jugadores emparejados entran en su partida y dejan de buscar.
@@ -263,8 +268,8 @@ function conectarTiempoReal(servidorHttp, {
     manejar("partida:abandonar", async () => abandonar());
 
     // RF-16 y RF-17: la lógica valida y resuelve; aquí solo se avisa a los dos jugadores.
-    manejar("combate:equipo", async ({ criaturas }) => {
-      const id = salas.elegirEquipo(email, criaturas);
+    manejar("combate:equipo", async ({ criaturas, aspectos }) => {
+      const id = salas.elegirEquipo(email, criaturas, aspectos);
       avisarPartida(id);
       return null;
     });
@@ -286,6 +291,8 @@ function conectarTiempoReal(servidorHttp, {
       io.to(salaDeUsuario(email)).emit("espectador:estado", r.vista);
       const chat = salas.chatDe(email);
       io.to(salaDeUsuario(email)).emit("chat:historial", chat);
+      if (anterior && anterior !== r.id) avisarSiExiste(anterior);
+      avisarPartida(r.id); // RF-37: los jugadores ven que alguien más les mira
       difundirLista(); // cambia el número de espectadores
       return null;
     });
@@ -293,6 +300,7 @@ function conectarTiempoReal(servidorHttp, {
     manejar("partida:dejar-observar", async () => {
       const id = salas.dejarDeObservar(email);
       io.in(salaDeUsuario(email)).socketsLeave(salaDeEspectadores(id));
+      avisarSiExiste(id);
       difundirLista();
       return null;
     });
@@ -343,7 +351,7 @@ function conectarTiempoReal(servidorHttp, {
         if (salas.busquedaDe(email)) salas.cancelarBusqueda(email);
         if (salas.partidaDe(email)) abandonar();
         else if (salas.observandoDe(email)) {
-          salas.dejarDeObservar(email);
+          avisarSiExiste(salas.dejarDeObservar(email));
           difundirLista();
         }
       }, esperaReconexionMs);

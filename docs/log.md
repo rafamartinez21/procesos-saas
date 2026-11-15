@@ -4,6 +4,8 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-15 | Etiqueta `hito-12` | [hito-12](https://github.com/rafamartinez21/procesos-saas/tree/hito-12) |
+| 2026-11-15 | RF-35, RF-36 y RF-37: criaturas con volumen y aspectos, arena viva con parajes y partículas, público en directo (D-32, D-33) | [PR #43](https://github.com/rafamartinez21/procesos-saas/pull/43) |
 | 2026-11-09 | Etiqueta `hito-11` | [hito-11](https://github.com/rafamartinez21/procesos-saas/tree/hito-11) |
 | 2026-11-09 | RF-33 y RF-34: emparejamiento rápido por ELO y revancha | [PR #42](https://github.com/rafamartinez21/procesos-saas/pull/42) |
 | 2026-11-09 | Etiqueta `hito-10` | [hito-10](https://github.com/rafamartinez21/procesos-saas/tree/hito-10) |

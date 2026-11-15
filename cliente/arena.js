@@ -1,8 +1,13 @@
-// ARENA DE COMBATE (frontend, RF-28)
+// ARENA DE COMBATE (frontend, RF-28 y RF-36)
 // Escenario con las dos criaturas frente a frente y el turno reproducido paso a paso:
-// embestida, impacto con el color del elemento, daño flotante, barra de PS que baja,
-// cambios de criatura y criaturas que caen. Solo dibuja: los datos de cada paso (daño,
+// embestida, proyectil del elemento, impacto con partículas, daño flotante, barra de PS que
+// baja, cambios de criatura y criaturas que caen. Solo dibuja: los datos de cada paso (daño,
 // PS que quedan, criatura que entra…) vienen en los eventos que calcula el servidor (D-20).
+//
+// Hito 12 (RF-36): el combate se libra en un paraje propio de cada elemento, con su ambiente
+// (brasas, lluvia, hojas, tormenta…), proyectiles y estallidos de partículas, auras de los
+// estados alterados, un rótulo con cada turno y un modo cine a pantalla completa. RF-37: la
+// arena muestra cuánta gente mira el combate en directo.
 //
 // Hay dos lados: "abajo" (tu criatura, o el primer jugador para un espectador) y
 // "arriba" (el rival). Si el sistema pide reducir el movimiento, no hay animaciones: cada
@@ -10,6 +15,8 @@
 
 import { el } from "./dom.js";
 import { retrato, iconoElemento } from "./retratos.js";
+import { escenario, biomaDe, BIOMAS } from "./escenarios.js";
+import { crearEfectos } from "./efectos.js";
 
 const ELEMENTO = { fuego: "Fuego", agua: "Agua", planta: "Planta", rayo: "Rayo", tierra: "Tierra", viento: "Viento", neutro: "Neutro" };
 const ESTADO = { quemado: "Quemado", congelado: "Congelado", paralizado: "Paralizado" };
@@ -31,38 +38,103 @@ function crearLado(posicion) {
   const nombre = el("strong", { class: "hud-nombre" });
   const etiquetas = el("span", { class: "hud-etiquetas" });
   const relleno = el("div", { class: "ps-relleno ps-alta" });
+  const resto = el("div", { class: "ps-resto" }); // el trozo de vida perdido se vacía después
   const texto = el("span", { class: "ps-texto" });
-  const barra = el("div", { class: "ps", role: "meter", "aria-valuemin": "0" }, relleno, texto);
+  const barra = el("div", { class: "ps", role: "meter", "aria-valuemin": "0" }, resto, relleno, texto);
   const pips = el("span", { class: "pips", "aria-hidden": "true" });
   const mods = el("span", { class: "mods" });
   const dueno = el("span", { class: "hud-dueno" });
   const hud = el("div", { class: "hud" }, el("div", { class: "hud-fila" }, nombre, etiquetas), barra, el("div", { class: "hud-fila hud-pie" }, dueno, mods, pips));
   const cuerpo = el("div", { class: "cuerpo" });
   const destello = el("div", { class: "destello" });
-  const sprite = el("div", { class: "sprite" }, el("div", { class: "plataforma" }), cuerpo, destello);
+  const portal = el("div", { class: "portal", "aria-hidden": "true" });
+  const sprite = el("div", { class: "sprite" }, el("div", { class: "plataforma" }), portal, cuerpo, destello);
   const nodo = el("div", { class: `lado lado-${posicion}` }, hud, sprite);
-  return { posicion, nodo, hud, nombre, etiquetas, relleno, texto, barra, pips, mods, dueno, cuerpo, destello, sprite, criatura: null, psMostrado: 0 };
+  return { posicion, nodo, hud, nombre, etiquetas, relleno, resto, texto, barra, pips, mods, dueno, cuerpo, destello, portal, sprite, criatura: null, psMostrado: 0 };
 }
 
-export function crearArena() {
+// Botón de modo cine: pone en pantalla completa el nodo indicado (la arena y sus controles).
+function botonCine(objetivo) {
+  const puede = typeof document !== "undefined" && document.fullscreenEnabled;
+  if (!puede) return null;
+  const boton = el("button", { type: "button", class: "arena-boton", "aria-label": "Modo cine (pantalla completa)", title: "Modo cine" }, "⛶");
+  boton.onclick = () => {
+    const destino = objetivo() || boton.closest(".arena");
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+    else if (destino && destino.requestFullscreen) destino.requestFullscreen().catch(() => {});
+  };
+  return boton;
+}
+
+// opciones.cine(): nodo que se pone a pantalla completa (por defecto, la propia arena).
+export function crearArena({ cine = () => null } = {}) {
   const abajo = crearLado("abajo");
   const arriba = crearLado("arriba");
   const narrador = el("p", { class: "narrador", "aria-live": "polite" });
   const capa = el("div", { class: "arena-capa" });
-  const nodo = el("div", { class: "arena" }, el("div", { class: "arena-fondo", "aria-hidden": "true" }), arriba.nodo, abajo.nodo, capa, el("div", { class: "narrador-caja" }, narrador));
+  const fondo = el("div", { class: "arena-fondo", "aria-hidden": "true" });
+  const lienzo = el("canvas", { class: "arena-lienzo", "aria-hidden": "true" });
+  const flash = el("div", { class: "arena-flash", "aria-hidden": "true" });
+  const rotulo = el("div", { class: "arena-rotulo", "aria-hidden": "true" });
+  const publico = el("span", { class: "arena-publico", hidden: true });
+  const lugar = el("span", { class: "arena-lugar" });
+  const esquina = el("div", { class: "arena-esquina" }, publico, botonCine(cine));
+  const nodo = el(
+    "div",
+    { class: "arena" },
+    fondo,
+    arriba.nodo,
+    abajo.nodo,
+    lienzo,
+    flash,
+    capa,
+    rotulo,
+    el("div", { class: "arena-cabecera" }, lugar, esquina),
+    el("div", { class: "narrador-caja" }, narrador)
+  );
   const lados = { abajo, arriba };
   const otro = (posicion) => (posicion === "abajo" ? "arriba" : "abajo");
+  const fx = crearEfectos(lienzo);
+  let bioma = null;
 
-  function pintarPs(l, ps) {
+  // Los relámpagos del fondo iluminan todo el escenario.
+  lienzo.addEventListener("trueno", () => animar(flash, [{ opacity: 0 }, { opacity: 0.35 }, { opacity: 0 }, { opacity: 0.2 }, { opacity: 0 }], { duration: 500 }));
+
+  // Escenario del combate (RF-36): lo decide el servidor al empezar y no cambia.
+  function ponerEscenario(elemento) {
+    const b = biomaDe(elemento);
+    if (bioma === b) return;
+    bioma = b;
+    fondo.replaceChildren(escenario(b));
+    nodo.dataset.bioma = b;
+    lugar.textContent = BIOMAS[b].nombre;
+    fx.ambiente(b);
+    fx.iniciar();
+  }
+
+  // Centro y tamaño de un lado, en píxeles dentro de la arena.
+  function centro(posicion) {
+    const r = lados[posicion].cuerpo.getBoundingClientRect();
+    const a = nodo.getBoundingClientRect();
+    return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * 0.55, w: r.width, h: r.height };
+  }
+  const punto = (posicion) => {
+    const c = centro(posicion);
+    return [c.x, c.y];
+  };
+
+  function pintarPs(l, ps, { resto = true } = {}) {
     const c = l.criatura;
     if (!c) return;
     const pct = Math.max(0, Math.round((100 * ps) / c.psMax));
     l.relleno.style.width = `${pct}%`;
+    if (resto) l.resto.style.width = `${pct}%`;
     l.relleno.className = `ps-relleno ps-${nivelPs(pct)}`;
     l.texto.textContent = `${ps} / ${c.psMax}`;
     l.barra.setAttribute("aria-valuemax", String(c.psMax));
     l.barra.setAttribute("aria-valuenow", String(ps));
     l.barra.setAttribute("aria-label", `PS de ${c.nombre}`);
+    l.hud.classList.toggle("en-peligro", pct > 0 && pct <= 20);
     l.psMostrado = ps;
   }
 
@@ -76,19 +148,22 @@ export function crearArena() {
     l.mods.replaceChildren(
       ...mods.map(([stat, n]) => el("span", { class: `mod ${n > 0 ? "sube" : "baja"}`, title: `${STAT_LARGO[stat]} ${n > 0 ? "+" : ""}${n}` }, `${STAT_CORTO[stat]} ${n > 0 ? "▲".repeat(n) : "▼".repeat(-n)}`))
     );
+    // Aura del estado alterado sobre la criatura (RF-36).
+    l.sprite.dataset.estado = c.estado || "";
+    fx.emisor(l.posicion, c.ps > 0 ? c.estado : null, () => centro(l.posicion));
   }
 
   // Coloca una criatura en un lado sin animación.
-  // criatura: { id, nombre, elemento, ps, psMax, estado }.
+  // criatura: { id, nombre, elemento, aspecto, ps, psMax, estado, mods }.
   function colocar(posicion, criatura, { dueno = "", restantes = null, total = 3 } = {}) {
     const l = lados[posicion];
-    const misma = l.criatura && l.criatura.id === criatura.id;
+    const misma = l.criatura && l.criatura.id === criatura.id && l.criatura.aspecto === criatura.aspecto;
     l.criatura = { ...criatura };
-    if (!misma) l.cuerpo.replaceChildren(retrato(criatura.id, { elemento: criatura.elemento, espejo: posicion === "arriba", titulo: criatura.nombre }));
+    if (!misma) l.cuerpo.replaceChildren(retrato(criatura.id, { elemento: criatura.elemento, aspecto: criatura.aspecto, espejo: posicion === "arriba", titulo: criatura.nombre }));
     l.nombre.textContent = criatura.nombre;
     l.dueno.textContent = dueno;
-    pintarEtiquetas(l);
     pintarPs(l, criatura.ps);
+    pintarEtiquetas(l);
     l.sprite.classList.toggle("caida", criatura.ps <= 0);
     l.cuerpo.style.opacity = "";
     if (restantes !== null) {
@@ -101,13 +176,34 @@ export function crearArena() {
   function vaciar(posicion) {
     lados[posicion].criatura = null;
     lados[posicion].nodo.hidden = true;
+    fx.emisor(posicion, null);
   }
 
   function narrar(texto) {
     narrador.textContent = texto || "";
   }
 
-  // Barra de PS que baja (o sube) poco a poco hasta el valor nuevo.
+  // RF-37: cuánta gente mira el combate.
+  function espectadores(n) {
+    publico.hidden = !n;
+    publico.textContent = n ? `👁 ${n} mirando` : "";
+    publico.setAttribute("aria-label", n === 1 ? "1 espectador mira el combate" : `${n} espectadores miran el combate`);
+  }
+
+  // Rótulo grande en el centro ("Turno 3", "¡Golpe crítico!"…).
+  async function anunciar(texto, clase = "") {
+    rotulo.textContent = texto;
+    rotulo.className = `arena-rotulo ${clase}`;
+    await animar(rotulo, [
+      { opacity: 0, transform: "translate(-50%, -50%) scale(0.6)", letterSpacing: "0.4em" },
+      { opacity: 1, transform: "translate(-50%, -50%) scale(1.05)", letterSpacing: "0.12em", offset: 0.25 },
+      { opacity: 1, transform: "translate(-50%, -50%) scale(1)", offset: 0.75 },
+      { opacity: 0, transform: "translate(-50%, -50%) scale(1.1)" },
+    ], { duration: 1000, easing: "ease-out" });
+  }
+
+  // Barra de PS que baja (o sube) poco a poco hasta el valor nuevo; el trozo perdido se queda
+  // un momento marcado y luego se vacía, como en los juegos de lucha.
   async function animarPs(posicion, destino) {
     const l = lados[posicion];
     if (!l.criatura) return;
@@ -115,10 +211,13 @@ export function crearArena() {
     if (sinMovimiento() || desde === destino) return pintarPs(l, destino);
     const pasos = 18;
     for (let i = 1; i <= pasos; i++) {
-      pintarPs(l, Math.round(desde + ((destino - desde) * i) / pasos));
+      pintarPs(l, Math.round(desde + ((destino - desde) * i) / pasos), { resto: destino > desde });
       await new Promise((r) => setTimeout(r, 22));
     }
     l.criatura.ps = destino;
+    setTimeout(() => {
+      if (l.criatura) l.resto.style.width = l.relleno.style.width;
+    }, 350);
   }
 
   function flotante(posicion, texto, clase = "") {
@@ -143,44 +242,56 @@ export function crearArena() {
     const dy = (corto ? -6 : -22) * d;
     await animar(l.cuerpo, [
       { transform: "translate(0, 0)" },
-      { transform: `translate(${-dx * 0.25}px, ${-dy * 0.25}px)`, offset: 0.25 },
-      { transform: `translate(${dx}px, ${dy}px) scale(1.06)`, offset: 0.55 },
+      { transform: `translate(${-dx * 0.25}px, ${-dy * 0.25}px) scale(0.97, 1.03)`, offset: 0.3 },
+      { transform: `translate(${dx}px, ${dy}px) scale(1.06)`, offset: 0.6 },
       { transform: "translate(0, 0)" },
-    ], { duration: 460, easing: "ease-in-out" });
+    ], { duration: corto ? 360 : 460, easing: "ease-in-out" });
   }
 
   async function impacto(posicion, elemento = "neutro", { fuerte = false } = {}) {
     const l = lados[posicion];
     l.destello.className = `destello destello-${elemento}`;
+    const [x, y] = punto(posicion);
+    fx.rafaga(x, y, elemento, { fuerza: fuerte ? 1.5 : 1 });
     const temblor = animar(l.cuerpo, [
       { transform: "translateX(0)" },
-      { transform: "translateX(-9px)" },
-      { transform: "translateX(8px)" },
+      { transform: "translateX(-9px) rotate(-2deg)" },
+      { transform: "translateX(8px) rotate(1.5deg)" },
       { transform: "translateX(-5px)" },
       { transform: "translateX(3px)" },
       { transform: "translateX(0)" },
     ], { duration: 380 });
     const luz = animar(l.destello, [{ opacity: 0, transform: "scale(0.6)" }, { opacity: fuerte ? 1 : 0.8, transform: "scale(1.1)", offset: 0.3 }, { opacity: 0, transform: "scale(1.3)" }], { duration: 520 });
     const parpadeo = animar(l.cuerpo, [{ filter: "brightness(1)" }, { filter: "brightness(2.2)" }, { filter: "brightness(1)" }, { filter: "brightness(1.8)" }, { filter: "brightness(1)" }], { duration: 380 });
-    if (fuerte) animar(nodo, [{ transform: "translate(0,0)" }, { transform: "translate(-4px, 3px)" }, { transform: "translate(4px, -2px)" }, { transform: "translate(0,0)" }], { duration: 260 });
+    if (fuerte) animar(nodo, [{ transform: "translate(0,0)" }, { transform: "translate(-6px, 4px)" }, { transform: "translate(5px, -3px)" }, { transform: "translate(-2px, 1px)" }, { transform: "translate(0,0)" }], { duration: 300 });
     await Promise.all([temblor, luz, parpadeo]);
   }
 
-  async function aura(posicion, elemento) {
+  async function aura(posicion, elemento, { sube = true } = {}) {
     const l = lados[posicion];
     l.destello.className = `destello destello-${elemento}`;
+    const c = centro(posicion);
+    fx.aura(c.x, c.y, elemento, { sube, ancho2: c.w * 0.8 });
     await animar(l.destello, [{ opacity: 0, transform: "scale(0.8)" }, { opacity: 0.85, transform: "scale(1.15)" }, { opacity: 0, transform: "scale(1.25)" }], { duration: 700 });
   }
 
   async function caer(posicion) {
     const l = lados[posicion];
-    await animar(l.cuerpo, [{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(36px) scale(0.9)", opacity: 0 }], { duration: 650, easing: "ease-in" });
+    const c = centro(posicion);
+    fx.emisor(posicion, null);
+    fx.disolver(c.x, c.y, c.w * 0.6, c.h * 0.6, l.criatura ? l.criatura.elemento : "neutro");
+    await animar(l.cuerpo, [
+      { transform: "translateY(0)", opacity: 1, filter: "brightness(1) saturate(1)" },
+      { transform: "translateY(-6px)", opacity: 1, filter: "brightness(1.6) saturate(0.4)", offset: 0.25 },
+      { transform: "translateY(36px) scale(0.9)", opacity: 0, filter: "brightness(2) saturate(0)" },
+    ], { duration: 800, easing: "ease-in" });
     l.sprite.classList.add("caida");
   }
 
   async function salir(posicion) {
     const l = lados[posicion];
     if (!l.criatura || l.sprite.classList.contains("caida")) return;
+    fx.emisor(posicion, null);
     await animar(l.cuerpo, [{ transform: "scale(1)", opacity: 1, filter: "brightness(1)" }, { transform: "scale(0.2)", opacity: 0, filter: "brightness(3)" }], { duration: 360, easing: "ease-in" });
     l.cuerpo.style.opacity = "0"; // hasta que entre la siguiente
   }
@@ -188,9 +299,12 @@ export function crearArena() {
   async function entrar(posicion) {
     const l = lados[posicion];
     l.sprite.classList.remove("caida");
-    const entrada = animar(l.cuerpo, [{ transform: "scale(0.2)", opacity: 0, filter: "brightness(3)" }, { transform: "scale(1.08)", opacity: 1, filter: "brightness(1.4)", offset: 0.7 }, { transform: "scale(1)", opacity: 1, filter: "brightness(1)" }], { duration: 480, easing: "ease-out" });
+    const c = centro(posicion);
+    fx.rafaga(c.x, c.y + c.h * 0.25, l.criatura ? l.criatura.elemento : "neutro", { cantidad: 14, fuerza: 0.8 });
+    const circulo = animar(l.portal, [{ opacity: 0, transform: "scale(0.3) rotateX(70deg)" }, { opacity: 1, transform: "scale(1.1) rotateX(70deg)", offset: 0.4 }, { opacity: 0, transform: "scale(1.4) rotateX(70deg)" }], { duration: 800, easing: "ease-out" });
+    const entrada = animar(l.cuerpo, [{ transform: "translateY(-30px) scale(0.2)", opacity: 0, filter: "brightness(3)" }, { transform: "translateY(4px) scale(1.08, 0.94)", opacity: 1, filter: "brightness(1.4)", offset: 0.7 }, { transform: "scale(1)", opacity: 1, filter: "brightness(1)" }], { duration: 520, easing: "ease-out" });
     l.cuerpo.style.opacity = "";
-    await entrada;
+    await Promise.all([entrada, circulo]);
   }
 
   function ponerEstado(posicion, estado) {
@@ -203,20 +317,24 @@ export function crearArena() {
   // Reproduce los eventos de un turno.
   //   ladoDe(ev): "abajo" o "arriba", el lado de quien protagoniza el evento.
   //   texto(ev): la frase del narrador.
-  async function reproducir(eventos, { ladoDe, texto, duenoDe = () => "" }) {
+  //   turno: si se indica, el turno empieza con su rótulo.
+  async function reproducir(eventos, { ladoDe, texto, duenoDe = () => "", turno = null }) {
+    if (turno && eventos.some((e) => e.tipo === "ataque" || e.tipo === "falla" || e.tipo === "modifica" || e.tipo === "cura")) await anunciar(`Turno ${turno}`, "turno");
     for (const ev of eventos) {
       const l = ladoDe(ev);
       narrar(texto(ev));
       switch (ev.tipo) {
         case "cambio":
           await salir(l);
-          colocar(l, { id: ev.id, nombre: ev.criatura, elemento: ev.elemento, ps: ev.ps, psMax: ev.psMax, estado: ev.estado || null, mods: ev.mods }, { dueno: duenoDe(l) });
+          colocar(l, { id: ev.id, nombre: ev.criatura, elemento: ev.elemento, aspecto: ev.aspecto, ps: ev.ps, psMax: ev.psMax, estado: ev.estado || null, mods: ev.mods }, { dueno: duenoDe(l) });
           await entrar(l);
           break;
         case "ataque": {
           const objetivo = otro(l);
-          await embestir(l);
           const fuerte = ev.eficacia > 1 || ev.critico;
+          await embestir(l, { corto: true });
+          await fx.proyectil(punto(l), punto(objetivo), ev.elemento || "neutro");
+          if (ev.critico) animar(flash, [{ opacity: 0 }, { opacity: 0.7 }, { opacity: 0 }], { duration: 260 });
           const golpe = impacto(objetivo, ev.elemento, { fuerte });
           flotante(objetivo, `-${ev.danio}`, ev.eficacia > 1 ? "eficaz" : ev.eficacia < 1 ? "flojo" : "");
           if (ev.critico) flotante(objetivo, "¡Crítico!", "critico");
@@ -262,7 +380,7 @@ export function crearArena() {
           }
           const flecha = ev.cambio > 0 ? "▲".repeat(ev.cambio) : ev.cambio < 0 ? "▼".repeat(-ev.cambio) : "=";
           flotante(afectado, `${STAT_LARGO[ev.stat]} ${flecha}`, ev.cambio > 0 ? "sube" : ev.cambio < 0 ? "baja" : "falla");
-          await aura(afectado, ev.cambio >= 0 ? "rayo" : "agua");
+          await aura(afectado, ev.cambio >= 0 ? "rayo" : "sombra", { sube: ev.cambio >= 0 });
           break;
         }
         case "debilitada":
@@ -276,5 +394,5 @@ export function crearArena() {
     }
   }
 
-  return { nodo, colocar, vaciar, narrar, reproducir, capa };
+  return { nodo, colocar, vaciar, narrar, reproducir, capa, espectadores, anunciar, escenario: ponerEscenario };
 }

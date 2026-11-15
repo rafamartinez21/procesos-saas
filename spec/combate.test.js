@@ -5,7 +5,7 @@
 
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { Combate, calcularDanio, PROB_CRITICO } = require("../servidor/juego/combate.js");
+const { Combate, calcularDanio, escenarioPara, PROB_CRITICO } = require("../servidor/juego/combate.js");
 
 const ANA = "ana@test.es";
 const LUIS = "luis@test.es";
@@ -266,7 +266,7 @@ test("la vista nunca revela la acción elegida ni el banquillo del rival", () =>
   const v = c.vista(LUIS);
   assert.deepEqual(Object.keys(v.rival).sort(), ["activa", "debeCambiar", "eleccionHecha", "equipoElegido", "restantes"]);
   // mods: las etapas de estadísticas (RF-31) son públicas, como el estado.
-  assert.deepEqual(Object.keys(v.rival.activa).sort(), ["elemento", "estado", "id", "mods", "nombre", "ps", "psMax"]);
+  assert.deepEqual(Object.keys(v.rival.activa).sort(), ["aspecto", "elemento", "estado", "id", "mods", "nombre", "ps", "psMax"]);
   assert.equal(JSON.stringify(v).includes("pirolince"), false);
   assert.equal(JSON.stringify(v).includes("@"), false);
 });
@@ -493,4 +493,57 @@ test("RF-31: los movimientos de apoyo no tienen eficacia en la vista", () => {
   const c = combate(["chispardo", "brason", "marejon"], ["musgolem", "rocadonte", "ciclonia"]);
   assert.equal("concentracion" in c.vista(ANA).yo.eficacias, false);
   assert.equal(c.vista(ANA).yo.eficacias.descarga, 0.5);
+});
+
+// ---------- RF-35: aspectos ----------
+
+test("RF-35: cada criatura lleva el aspecto elegido; si no se elige, el normal", () => {
+  const c = new Combate([ANA, LUIS], { aleatorio: () => 0.5 });
+  c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"], ["astral", null, "sombra"]);
+  c.elegirEquipo(LUIS, ["marejon", "musgolem", "rocadonte"]);
+  assert.deepEqual(c.vista(ANA).yo.equipo.map((x) => x.aspecto), ["astral", "normal", "sombra"]);
+  assert.equal(c.vista(LUIS).rival.activa.aspecto, "astral");
+  assert.equal(c.vista(ANA).rival.activa.aspecto, "normal");
+  assert.equal(c.vistaEspectador({ [ANA]: "Ana", [LUIS]: "Luis" }).jugadores[0].activa.aspecto, "astral");
+});
+
+test("RF-35: el evento de cambio dice qué aspecto tiene la criatura que entra", () => {
+  const c = new Combate([ANA, LUIS], { aleatorio: () => 0.5 });
+  c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"], ["normal", "sombra", "normal"]);
+  c.elegirEquipo(LUIS, ["marejon", "musgolem", "rocadonte"]);
+  c.elegirAccion(ANA, cambiar(1));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  const ev = c.vista(LUIS).eventos.find((e) => e.tipo === "cambio");
+  assert.deepEqual([ev.id, ev.aspecto], ["brason", "sombra"]);
+});
+
+test("[error] RF-35: un aspecto que no existe o que no viene en una lista se rechaza", () => {
+  const c = new Combate([ANA, LUIS], { aleatorio: () => 0.5 });
+  esperarError(() => c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"], ["dorado"]), "ASPECTO_INVALIDO");
+  esperarError(() => c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"], "astral"), "ASPECTO_INVALIDO");
+  assert.equal(c.vista(ANA).yo.equipo, null, "no se queda con el equipo a medias");
+});
+
+// ---------- RF-36: escenario ----------
+
+test("RF-36: el combate se libra en un paraje fijo que ven igual los dos jugadores y el público", () => {
+  const { ELEMENTOS } = require("../servidor/juego/criaturas.js");
+  const c = new Combate([ANA, LUIS], { aleatorio: () => 0.5 });
+  assert.equal(c.vista(ANA).escenario, null, "en la elección de equipo aún no hay paraje");
+  c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"]);
+  c.elegirEquipo(LUIS, ["marejon", "musgolem", "rocadonte"]);
+  const e = c.vista(ANA).escenario;
+  assert.ok(ELEMENTOS.includes(e));
+  assert.equal(c.vista(LUIS).escenario, e);
+  assert.equal(c.vistaEspectador({}).escenario, e);
+  c.elegirAccion(ANA, atacar("embestida"));
+  c.elegirAccion(LUIS, atacar("embestida"));
+  assert.equal(c.vista(ANA).escenario, e, "no cambia durante el combate");
+  assert.equal(escenarioPara(["pirolince", "marejon"]), e, "depende solo de las criaturas que abren");
+});
+
+test("RF-36: con criaturas distintas salen parajes distintos", () => {
+  const { CATALOGO } = require("../servidor/juego/criaturas.js");
+  const parajes = new Set(CATALOGO.map((c) => escenarioPara([c.id, "marejon"])));
+  assert.ok(parajes.size >= 4, `solo ${parajes.size} parajes distintos`);
 });

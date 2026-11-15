@@ -12,9 +12,17 @@
 //  3. terminada: gana quien deja al rival sin criaturas, o quien se queda si el otro abandona (RF-18).
 
 const { ErrorNegocio } = require("../modelo.js");
-const { obtenerCriatura, obtenerMovimiento, eficacia, ETAPA_MAXIMA, multiplicadorEtapa } = require("./criaturas.js");
+const { obtenerCriatura, obtenerMovimiento, eficacia, ETAPA_MAXIMA, multiplicadorEtapa, ASPECTOS, ASPECTO_POR_DEFECTO, ELEMENTOS } = require("./criaturas.js");
 
 const TAMANO_EQUIPO = 3;
+
+// RF-36: paraje donde se libra el combate (uno por elemento). Sale de las dos criaturas que
+// abren el combate, sin usar el azar (así no cambia la secuencia de números del combate):
+// es el mismo para los dos jugadores y para el público, y no cambia al recargar.
+function escenarioPara(ids) {
+  const suma = ids.join("|").split("").reduce((t, c) => t + c.charCodeAt(0), 0);
+  return ELEMENTOS[suma % ELEMENTOS.length];
+}
 const BONO_MISMO_ELEMENTO = 1.25; // un movimiento del elemento de la criatura pega más
 const PROB_DESCONGELAR = 0.3;
 const PROB_PARALISIS = 0.25;
@@ -58,6 +66,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
   this.fase = FASE_SELECCION;
   this.turno = 0;
   this.ganador = null;
+  this.escenario = null; // RF-36: paraje del combate (un elemento), al empezar la fase de combate
   this.motivo = null;
   this.eventos = []; // lo ocurrido en el último turno resuelto
   // RF-29: crónica de todo el combate, turno a turno: [{ turno, eventos }]. Se guardan como
@@ -90,11 +99,14 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     j.activa = indice;
   };
   // Evento de cambio con lo que el cliente necesita para dibujar a la criatura que entra (RF-28).
-  const eventoCambio = (email, c) => ({ tipo: "cambio", quien: email, criatura: c.nombre, id: c.id, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
+  const eventoCambio = (email, c) => ({ tipo: "cambio", quien: email, criatura: c.nombre, id: c.id, elemento: c.elemento, aspecto: c.aspecto, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
+  // Lo que se enseña de una criatura en combate (a jugadores y espectadores).
+  const publica = (c) => ({ id: c.id, nombre: c.nombre, elemento: c.elemento, aspecto: c.aspecto, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
   const vivas = (j) => j.equipo.filter((c) => c.ps > 0).length;
 
   // ---------- RF-16: elegir equipo ----------
-  this.elegirEquipo = function (email, ids) {
+  // aspectos (RF-35, opcional): un aspecto por criatura, en el mismo orden; si falta, "normal".
+  this.elegirEquipo = function (email, ids, aspectos = []) {
     const j = exigirJugador(email);
     exigirFase(FASE_SELECCION);
     if (j.equipo) throw new ErrorNegocio("EQUIPO_YA_ELEGIDO", "Ya has elegido tu equipo");
@@ -104,10 +116,14 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     if (new Set(ids).size !== ids.length) throw new ErrorNegocio("EQUIPO_INVALIDO", "No puedes repetir criaturas");
     const datos = ids.map((id) => (typeof id === "string" ? obtenerCriatura(id) : undefined));
     if (datos.some((d) => !d)) throw new ErrorNegocio("EQUIPO_INVALIDO", "Alguna criatura no existe");
-    j.equipo = datos.map(nuevaInstancia);
+    if (!Array.isArray(aspectos)) throw new ErrorNegocio("ASPECTO_INVALIDO", "Los aspectos deben ser una lista");
+    const elegidos = ids.map((_, i) => (aspectos[i] === undefined || aspectos[i] === null ? ASPECTO_POR_DEFECTO : aspectos[i]));
+    if (elegidos.some((a) => !ASPECTOS.includes(a))) throw new ErrorNegocio("ASPECTO_INVALIDO", "Ese aspecto no existe");
+    j.equipo = datos.map((d, i) => ({ ...nuevaInstancia(d), aspecto: elegidos[i] }));
     if ([...jugadores.values()].every((x) => x.equipo)) {
       this.fase = FASE_COMBATE;
       this.turno = 1;
+      this.escenario = escenarioPara(emails.map((e) => jugadores.get(e).equipo[0].id));
     }
     return this.fase;
   };
@@ -337,7 +353,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       const c = j.equipo && this.fase !== FASE_SELECCION ? activa(j) : null;
       return {
         nombre: nombre(e),
-        activa: c ? { id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } } : null,
+        activa: c ? publica(c) : null,
         restantes: j.equipo ? vivas(j) : null,
         eleccionHecha: this.fase === FASE_SELECCION ? Boolean(j.equipo) : Boolean(j.accion),
       };
@@ -355,6 +371,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     return {
       fase: this.fase,
       turno: this.turno,
+      escenario: this.escenario,
       jugadores: emails.map(lado),
       eventos: this.eventos.map(traducir),
       cronica: this.cronica.map((t) => ({ turno: t.turno, eventos: t.eventos.map(traducir) })),
@@ -377,10 +394,11 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
       if ("ganador" in copia) copia.ganador = quien(copia.ganador);
       return copia;
     };
-    const criatura = (c) => ({ id: c.id, nombre: c.nombre, elemento: c.elemento, ps: c.ps, psMax: c.psMax, estado: c.estado, mods: { ...c.mods } });
+    const criatura = publica;
     return {
       fase: this.fase,
       turno: this.turno,
+      escenario: this.escenario,
       yo: {
         equipo: j.equipo
           ? j.equipo.map((c) => ({ ...criatura(c), movimientos: c.movimientos.map((m) => ({ id: m, ...obtenerMovimiento(m) })) }))
@@ -410,4 +428,4 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
   };
 }
 
-module.exports = { Combate, calcularDanio, PROB_CRITICO, TAMANO_EQUIPO, FASE_SELECCION, FASE_COMBATE, FASE_TERMINADA };
+module.exports = { Combate, calcularDanio, escenarioPara, PROB_CRITICO, TAMANO_EQUIPO, FASE_SELECCION, FASE_COMBATE, FASE_TERMINADA };

@@ -510,3 +510,25 @@ test("RF-33: mientras busca, al jugador se le avisa cuando se amplía su margen 
   t = 10000;
   assert.equal((await ampliado).margen, 150);
 });
+
+// ---------- RF-35 y RF-37 ----------
+
+test("RF-35: el aspecto elegido con el equipo llega a la vista del rival", async () => {
+  const { ana, luis } = await enCombate();
+  await emitir(ana, "combate:equipo", { criaturas: ["pirolince", "brason", "voltarda"], aspectos: ["sombra", "normal", "normal"] });
+  const vista = esperarQue(luis, "combate:estado", (v) => v.fase === "combate");
+  await emitir(luis, "combate:equipo", { criaturas: ["marejon", "musgolem", "rocadonte"] });
+  assert.equal((await vista).rival.activa.aspecto, "sombra");
+});
+
+test("RF-37: cuando alguien empieza o deja de mirar, los jugadores reciben el número de espectadores", async () => {
+  const { ana, partida } = await enCombate();
+  const eva = await clienteDe("eva@test.es");
+  await listo(eva);
+  const uno = esperarQue(ana, "combate:estado", (v) => v.espectadores === 1);
+  await emitir(eva, "partida:observar", { id: partida.id });
+  await uno;
+  const cero = esperarQue(ana, "combate:estado", (v) => v.espectadores === 0);
+  await emitir(eva, "partida:dejar-observar");
+  await cero;
+});

@@ -1,7 +1,7 @@
 ---
 type: Sprint
 title: Sprint 3
-description: Objetivo del Sprint 3 (nueva interfaz y más profundidad para Ecos de Aetheria), hitos 9 a 11 con sus requisitos y estimaciones, lo hecho en cada hito y retrospectiva.
+description: Objetivo del Sprint 3 (nueva interfaz y más profundidad para Ecos de Aetheria), hitos 9 a 12 con sus requisitos y estimaciones, lo hecho en cada hito y retrospectiva.
 timestamp: 2026-11-09
 ---
 
@@ -24,7 +24,7 @@ Las reglas siguen en la capa de lógica del servidor (D-20). El cliente solo dib
 
 ## Hitos
 
-Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
+Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-12`).
 
 ### Hito 9: nueva interfaz del juego
 
@@ -50,7 +50,17 @@ Cada hito termina con una etiqueta en `main` (`hito-9` … `hito-11`).
 | RF-33 | Emparejamiento rápido con un rival de ELO parecido | 5 h | hecho |
 | RF-34 | Revancha al terminar un combate | 3 h | hecho |
 
-Total estimado: 43 h.
+### Hito 12: un combate que se vea bien
+
+Añadido el 15/11 al probar el hito 11: las criaturas seguían viéndose planas, el fondo de la arena era el mismo en todos los combates y en un portátil había que bajar para elegir el movimiento, así que no se veía el combate mientras se jugaba.
+
+| ID | Requisito | Estimación | Estado |
+|---|---|---|---|
+| RF-35 | Criaturas con volumen y aspectos a elegir (normal, astral y sombra) que ven el rival y el público | 6 h | hecho |
+| RF-36 | Arena viva: un paraje por elemento con su ambiente, proyectiles y partículas de cada elemento, rótulos de turno y modo cine; la arena y los controles se ven a la vez en portátil y en móvil | 8 h | hecho |
+| RF-37 | Los jugadores ven cuánta gente mira su combate en directo | 2 h | hecho |
+
+Total estimado: 59 h (43 h de los hitos 9 a 11 y 16 h del hito 12).
 
 ## Cómo se trabaja cada requisito
 
@@ -86,6 +96,18 @@ Igual que en el Sprint 2:
 
 - **Qué se hizo:** duelo rápido con emparejamiento por ELO y margen creciente, y revancha en la misma partida.
 - **PR y etiqueta:** [PR #42](https://github.com/rafamartinez21/procesos-saas/pull/42) (RF-33 y RF-34 juntos, porque los dos cambian cómo empieza un combate en `Salas`). Etiqueta `hito-11`.
+
+### Hito 12: un combate que se vea bien
+
+- **Qué se hizo:**
+  - las doce criaturas tienen volumen (contorno, sombra propia y luz de borde con un filtro SVG), parpadean y pueden llevar tres aspectos: normal, astral y sombra (D-32). El aspecto se elige debajo de cada criatura de la bandeja, el navegador recuerda el preferido y el servidor lo valida y lo manda al rival y al público;
+  - seis parajes dibujados en SVG, uno por elemento (Caldera de Ígnea, Lago de la Marea Quieta, Bosque de los Susurros, Cumbre de la Tormenta, Cañón de los Gigantes e Islas del Cielo Abierto), con su ambiente animado (brasas, lluvia, hojas, relámpagos, polvo o rachas de viento). El servidor elige el paraje al empezar el combate (D-33);
+  - cada ataque lanza un proyectil del elemento del movimiento (bola de fuego, chorro de agua, hojas, rayo, rocas o cortes de viento) que estalla en partículas; los críticos destellan, las criaturas que caen se deshacen en polvo de éter, las que entran lo hacen sobre un círculo de invocación y los estados alterados se ven sobre la criatura (brasas, escarcha o chispas). Cada turno empieza con su rótulo y la barra de PS deja marcado un momento el trozo perdido;
+  - en pantallas anchas la arena y los controles van uno al lado del otro, y en el móvil la arena es cuadrada: en los dos casos se ven el combate y los cuatro movimientos sin bajar. Botón de modo cine (pantalla completa);
+  - los jugadores ven en la arena cuánta gente mira el combate, y el número cambia en cuanto alguien entra o sale.
+- **PR y etiqueta:** [PR #43](https://github.com/rafamartinez21/procesos-saas/pull/43). Etiqueta `hito-12`.
+- **Cómo se comprobó:** pruebas "RF-35", "RF-36" y "RF-37" en `spec/` (322 en total). En el navegador, con dos cuentas locales: elección de aspectos, duelo rápido contra un segundo jugador, un espectador entrando a mirar, recarga en mitad del combate (mismo paraje), en escritorio y a 375 px.
+- **Desviaciones:** los tres requisitos van en un solo pull request porque comparten la arena y la vista del combate; separarlos habría obligado a deshacer y rehacer los mismos archivos. Es el mismo caso que el hito 11.
 
 ## Retrospectiva
 

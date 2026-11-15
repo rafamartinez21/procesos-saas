@@ -619,3 +619,16 @@ test("RF-34: contra el Autómata la revancha empieza en cuanto la pides", () => 
   assert.deepEqual(s.pedirRevancha("ana@test.es"), { id, empieza: true });
   assert.equal(s.vistaCombate("ana@test.es").fase, "seleccion");
 });
+
+// ---------- RF-37: público en directo ----------
+
+test("RF-37: los jugadores y los espectadores ven cuánta gente mira el combate", () => {
+  const s = conCombate();
+  assert.equal(s.vistaCombate("ana@test.es").espectadores, 0);
+  assert.equal(s.observar("P1", eva).vista.espectadores, 1, "quien entra a mirar ya se cuenta");
+  assert.equal(s.vistaCombate("ana@test.es").espectadores, 1);
+  assert.equal(s.vistaCombate("luis@test.es").espectadores, 1);
+  assert.equal(s.vistaEspectador("P1").espectadores, 1);
+  s.dejarDeObservar("eva@test.es");
+  assert.equal(s.vistaCombate("ana@test.es").espectadores, 0);
+});

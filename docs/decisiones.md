@@ -194,3 +194,15 @@ timestamp: 2026-10-28
 - **Por qué:** sin plazo, un jugador podía dejar el combate parado para siempre y su rival solo podía rendirse. Con el reloj inyectado (`ahora`), las pruebas adelantan el tiempo sin esperar. El cliente recibe los milisegundos que quedan y no una hora absoluta, así que no le afecta que su reloj vaya adelantado o atrasado. Como las partidas viven en memoria en una sola instancia (D-21), un temporizador por servidor basta.
 - **Estado:** vigente.
 
+## D-32 Los aspectos de las criaturas son solo de aspecto y todos están disponibles
+
+- **Qué se decidió:** cada criatura puede llevar uno de tres aspectos (normal, astral o sombra). Solo cambian el dibujo: mismas estadísticas y movimientos. El jugador elige el aspecto de cada criatura al elegir equipo; el servidor comprueba que exista y lo guarda en la instancia de la criatura, así que lo ven el rival y el público. Los tres están disponibles para todos desde el principio. El aspecto preferido de cada criatura se recuerda en el navegador (`localStorage`) como comodidad: el que cuenta es el que se envía con el equipo. Los aspectos se dibujan con filtros SVG sobre el mismo dibujo (giro de color y halo para el astral; tonos medios oscurecidos, tinte violeta y aura para el de sombra) más adornos propios (estrellas y humo).
+- **Por qué:** personalizar el equipo da identidad sin tocar el equilibrio del combate. Desbloquearlos con victorias obligaría a guardar inventario por usuario y a decidir reglas de progreso que no se han pedido. Con filtros no hay que dibujar 36 criaturas: un dibujo y tres tratamientos. Si el servidor no validara el aspecto, un cliente podría mandar cualquier texto al rival.
+- **Estado:** vigente.
+
+## D-33 Los efectos se pintan en un canvas y el servidor elige el paraje sin azar
+
+- **Qué se decidió:** las partículas (ambiente del paraje, proyectiles, estallidos, estados) se pintan en un `<canvas>` encima del escenario con `requestAnimationFrame` ([cliente/efectos.js](../cliente/efectos.js)); los parajes y las criaturas siguen siendo SVG. Cada proyectil se da por llegado aunque el canvas deje de pintarse (pestaña en segundo plano), para que la reproducción del turno nunca se quede esperando. Sin animaciones si el sistema pide reducir el movimiento. El paraje lo decide el servidor al empezar la fase de combate a partir de las dos criaturas que abren (`escenarioPara`) y viaja en las vistas.
+- **Por qué:** cientos de partículas como nodos del DOM serían lentas; en un canvas cuestan poco. El paraje tiene que ser el mismo para los dos jugadores y el público, y no cambiar al recargar, así que no puede elegirlo cada cliente. No se usa el generador de azar del combate para no cambiar la secuencia de números de la que dependen las pruebas de daño y estados.
+- **Estado:** vigente.
+

@@ -39,6 +39,25 @@ function mostrarError(err) {
   mostrarMensaje(err && err.message ? err.message : "Ha ocurrido un error inesperado.", "error");
 }
 
+// RF-35: aspecto preferido de cada criatura, solo en este navegador (comodidad, no estado
+// del juego: el que vale es el que se envía con el equipo).
+const CLAVE_ASPECTOS = "aetheria.aspectos";
+function leerAspectos() {
+  try {
+    const datos = JSON.parse(localStorage.getItem(CLAVE_ASPECTOS) || "{}");
+    return datos && typeof datos === "object" ? datos : {};
+  } catch {
+    return {};
+  }
+}
+function guardarAspectos(aspectos) {
+  try {
+    localStorage.setItem(CLAVE_ASPECTOS, JSON.stringify(aspectos));
+  } catch {
+    // sin almacenamiento: se olvida al recargar
+  }
+}
+
 const inicial = (texto) => (texto || "?").trim().charAt(0).toUpperCase() || "?";
 
 // ---------- pantalla de acceso (sin sesión) ----------
@@ -286,13 +305,13 @@ async function pantallaPrincipal(usuario) {
 // jugadores se insertan con textContent (función el), nunca con innerHTML.
 
 function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo = () => {} } = {}) {
-  const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, busqueda: null, conectado: false, catalogo: [], seleccion: [], filtro: null, chat: [] };
+  const estado = { lista: [], enCurso: [], partida: null, combate: null, mirando: null, busqueda: null, conectado: false, catalogo: [], seleccion: [], filtro: null, aspectos: leerAspectos(), chat: [] };
   const zona = el("div", { class: "vestibulo" });
   // Controladores de la arena (RF-28): viven mientras dura el combate o mientras se mira
   // una partida, para que redibujar el vestíbulo no corte las animaciones.
   let controlador = null;
   let espectador = null;
-  const contextoSeleccion = () => ({ catalogo: estado.catalogo, seleccion: estado.seleccion, filtro: estado.filtro });
+  const contextoSeleccion = () => ({ catalogo: estado.catalogo, seleccion: estado.seleccion, filtro: estado.filtro, aspectos: estado.aspectos });
   const nombre = usuario.nombre || usuario.email.split("@")[0];
 
   // El catálogo de criaturas solo hace falta para elegir equipo; se pide una vez.
@@ -320,7 +339,13 @@ function panelVestibulo(usuario, { alTerminarCombate = () => {}, alCambiarModo =
       estado.filtro = elemento;
       dibujar();
     },
-    confirmarEquipo: () => enCombate(() => ClienteJuego.elegirEquipo(estado.seleccion)),
+    // RF-35: el aspecto preferido de cada criatura se recuerda en este navegador.
+    elegirAspecto: (id, aspecto) => {
+      estado.aspectos = { ...estado.aspectos, [id]: aspecto };
+      guardarAspectos(estado.aspectos);
+      dibujar();
+    },
+    confirmarEquipo: () => enCombate(() => ClienteJuego.elegirEquipo(estado.seleccion, estado.seleccion.map((id) => estado.aspectos[id] || "normal"))),
     atacar: (movimiento) => enCombate(() => ClienteJuego.atacar(movimiento)),
     cambiar: (indice) => enCombate(() => ClienteJuego.cambiar(indice)),
     salir: () => ejecutar(() => ClienteJuego.abandonar()),

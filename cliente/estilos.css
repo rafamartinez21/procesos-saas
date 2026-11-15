@@ -635,3 +635,160 @@ td.acciones { display: flex; gap: 6px; }
 button.latiendo { animation: latir 1.2s ease-in-out infinite; }
 @keyframes latir { 50% { transform: scale(1.04); box-shadow: 0 0 0 6px rgba(116, 143, 252, 0.2); } }
 
+
+/* ==========================================================================
+   Hito 12 · criaturas con volumen y aspectos (RF-35), arena viva (RF-36),
+   público en directo (RF-37)
+   ========================================================================== */
+
+/* ---------- retratos: vida propia ---------- */
+.retrato .ojo { transform-box: fill-box; transform-origin: center; animation: parpadeo 5.2s infinite; animation-delay: var(--retraso, 0s); }
+@keyframes parpadeo { 0%, 93%, 100% { transform: scaleY(1); } 95.5% { transform: scaleY(0.12); } }
+.retrato .brillo { transform-box: fill-box; transform-origin: center; animation: titilar 2.4s ease-in-out infinite; }
+@keyframes titilar { 0%, 100% { opacity: 0.25; transform: scale(0.6) rotate(0deg); } 50% { opacity: 1; transform: scale(1.15) rotate(45deg); } }
+.retrato .humo { transform-box: fill-box; transform-origin: center; animation: humear 3.3s ease-in-out infinite; }
+@keyframes humear { 0% { opacity: 0; transform: translateY(4px) scale(0.7); } 40% { opacity: 0.6; } 100% { opacity: 0; transform: translateY(-14px) scale(1.4); } }
+.carta .retrato-carta.aspecto-astral { filter: drop-shadow(0 0 10px rgba(165, 243, 255, 0.45)); }
+.carta .retrato-carta.aspecto-sombra { filter: drop-shadow(0 0 10px rgba(139, 44, 245, 0.5)); }
+
+/* ---------- selector de aspecto en la bandeja ---------- */
+.hueco { display: grid; justify-items: center; gap: 6px; }
+.aspectos { display: flex; gap: 3px; }
+.muestra {
+  width: 26px; height: 26px; padding: 1px; border-radius: 8px; min-height: 0;
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--linea-suave); box-shadow: none;
+}
+.muestra .retrato { width: 100%; height: 100%; }
+.muestra .retrato .ojo, .muestra .retrato .brillo, .muestra .retrato .humo { animation: none; }
+.muestra:hover:not([disabled]) { background: rgba(255, 255, 255, 0.1); box-shadow: none; transform: translateY(-1px); }
+.muestra[aria-checked="true"] { border-color: var(--oro); background: rgba(242, 201, 109, 0.16); box-shadow: 0 0 0 2px rgba(242, 201, 109, 0.25); }
+.muestra-astral[aria-checked="true"] { border-color: #a5f3ff; background: rgba(165, 243, 255, 0.14); box-shadow: 0 0 0 2px rgba(165, 243, 255, 0.25); }
+.muestra-sombra[aria-checked="true"] { border-color: #9775fa; background: rgba(139, 44, 245, 0.2); box-shadow: 0 0 0 2px rgba(139, 44, 245, 0.3); }
+
+/* ---------- escenario de cada elemento ---------- */
+.arena[data-bioma] .arena-fondo { background: #0b0d1f; }
+.arena[data-bioma] .arena-fondo::before, .arena[data-bioma] .arena-fondo::after { display: none; }
+.escenario { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.escenario .estrella-fondo { animation: titilar-fondo 3.5s ease-in-out infinite; }
+@keyframes titilar-fondo { 50% { opacity: 0.15; } }
+.escenario .lava-brillo { animation: lava 2.6s ease-in-out infinite; }
+@keyframes lava { 50% { opacity: 0.35; } }
+.escenario .humo-fondo { transform-box: fill-box; transform-origin: center; animation: humo-fondo 7s ease-in-out infinite; }
+@keyframes humo-fondo { 0% { transform: translate(0, 4px) scale(0.8); opacity: 0; } 30% { opacity: 0.55; } 100% { transform: translate(10px, -10px) scale(1.5); opacity: 0; } }
+.escenario .ola { animation: ola 3.2s ease-in-out infinite; }
+@keyframes ola { 50% { transform: translateX(3px); opacity: 0.15; } }
+.escenario .nube { animation: nube 18s ease-in-out infinite alternate; }
+@keyframes nube { to { transform: translateX(14px); } }
+.escenario .isla { animation: isla 6s ease-in-out infinite; }
+@keyframes isla { 50% { transform: translateY(-2px); } }
+.escenario .cristal-brillo { animation: lava 1.8s ease-in-out infinite; }
+.arena-lienzo { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.arena-flash { position: absolute; inset: 0; z-index: 1; background: #fff; opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+.arena-capa { z-index: 1; }
+
+/* Cabecera de la arena: nombre del paraje, público y modo cine. */
+.arena-cabecera {
+  position: absolute; left: 0; right: 0; top: 0; z-index: 3; pointer-events: none;
+  display: flex; justify-content: center; align-items: flex-start; padding: 10px 12px;
+}
+.arena-lugar {
+  font-family: var(--fuente-titulo); font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--oro-claro); padding: 4px 12px; border-radius: 999px;
+  background: rgba(5, 7, 20, 0.55); border: 1px solid var(--linea); backdrop-filter: blur(4px);
+}
+.arena-lugar:empty { display: none; }
+.arena-esquina { position: absolute; right: 12px; top: 10px; display: flex; gap: 6px; align-items: center; pointer-events: auto; }
+.arena-publico {
+  font-size: 0.74rem; font-weight: 700; padding: 4px 10px; border-radius: 999px;
+  background: rgba(201, 42, 42, 0.75); color: #fff; border: 1px solid rgba(255, 168, 168, 0.5);
+  box-shadow: 0 0 12px rgba(201, 42, 42, 0.45);
+}
+.arena-publico[hidden] { display: none; }
+.arena-boton {
+  width: 32px; height: 32px; min-height: 0; padding: 0; border-radius: 10px; font-size: 1rem; line-height: 1;
+  background: rgba(5, 7, 20, 0.6); color: var(--texto); border: 1px solid var(--linea); box-shadow: none;
+}
+.arena-boton:hover:not([disabled]) { background: rgba(242, 201, 109, 0.2); box-shadow: none; }
+
+/* Rótulo central de turno, inicio y golpes críticos. */
+.arena-rotulo {
+  position: absolute; left: 50%; top: 42%; z-index: 4; transform: translate(-50%, -50%); opacity: 0; pointer-events: none;
+  font: 800 clamp(1.6rem, 5vw, 3rem)/1 var(--fuente-titulo); letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+  color: var(--oro-claro); text-shadow: 0 3px 0 #2a1a05, 0 0 30px rgba(242, 201, 109, 0.6);
+}
+.arena-rotulo.inicio { color: #fff; text-shadow: 0 3px 0 #1b1036, 0 0 34px rgba(116, 143, 252, 0.9); }
+
+/* Plataformas de piedra con el color del paraje. */
+.arena[data-bioma] .plataforma {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(255, 255, 255, 0.18), transparent 55%),
+    radial-gradient(ellipse at 50% 50%, var(--plat, rgba(116, 143, 252, 0.35)) 0 48%, rgba(0, 0, 0, 0.35) 50% 62%, transparent 72%);
+}
+.arena[data-bioma="fuego"] { --plat: rgba(255, 107, 26, 0.32); }
+.arena[data-bioma="agua"] { --plat: rgba(58, 160, 255, 0.32); }
+.arena[data-bioma="planta"] { --plat: rgba(81, 207, 102, 0.3); }
+.arena[data-bioma="rayo"] { --plat: rgba(92, 124, 250, 0.4); }
+.arena[data-bioma="tierra"] { --plat: rgba(192, 138, 79, 0.4); }
+.arena[data-bioma="viento"] { --plat: rgba(56, 217, 169, 0.32); }
+.portal {
+  position: absolute; left: 5%; right: 5%; bottom: -6%; height: 34%; border-radius: 50%; opacity: 0; pointer-events: none;
+  border: 3px solid rgba(242, 201, 109, 0.9); box-shadow: 0 0 24px rgba(242, 201, 109, 0.8), inset 0 0 18px rgba(116, 143, 252, 0.8);
+}
+
+/* Estados alterados sobre la criatura. */
+.sprite[data-estado="congelado"] .cuerpo svg { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)) saturate(0.5) hue-rotate(170deg) brightness(1.15); }
+.sprite[data-estado="paralizado"] .cuerpo { animation: temblor 0.35s steps(2) infinite; }
+@keyframes temblor { 50% { transform: translateX(1.5px); } }
+.sprite[data-estado="quemado"] .cuerpo svg { filter: drop-shadow(0 10px 14px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 8px rgba(255, 122, 47, 0.55)); }
+.destello-sombra { --c: rgba(112, 72, 232, 0.95); }
+
+/* Barra de PS: el trozo perdido queda marcado un momento. */
+.ps-resto { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.65); transition: width 0.5s ease-out; }
+.ps .ps-relleno { position: relative; }
+.hud.en-peligro { border-color: rgba(255, 107, 107, 0.6); animation: peligro 1.2s ease-in-out infinite; }
+@keyframes peligro { 50% { box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.25), 0 10px 24px rgba(0, 0, 0, 0.45); } }
+
+/* Modo cine: la partida a pantalla completa. */
+.partida-actual:fullscreen, .arena:fullscreen { background: var(--noche); padding: 16px; overflow-y: auto; }
+.partida-actual:fullscreen .arena { aspect-ratio: auto; height: min(72vh, calc(100vw * 9 / 16)); max-width: none; }
+.arena:fullscreen { border-radius: 0; aspect-ratio: auto; }
+
+@media (max-width: 640px) {
+  .arena-cabecera { justify-content: flex-start; padding: 8px 10px; }
+  .arena-lugar { display: none; }
+  .hud .elemento { font-size: 0; gap: 0; padding: 3px 5px; }
+  .hud .elemento .icono { width: 12px; height: 12px; }
+  .hud .estado { font-size: 0.58rem; padding: 2px 5px; }
+  .arena[data-bioma] .lado-arriba .hud { top: 50px; }
+  .lado-abajo .hud { bottom: 84px; }
+  .narrador { font-size: 0.84rem; }
+  .arena-esquina { top: 8px; right: 10px; }
+  .muestra { width: 22px; height: 22px; border-radius: 6px; }
+}
+
+.arena[data-bioma] .lado-arriba .hud { top: 48px; }
+
+/* RF-36: en pantallas anchas, la arena y los controles van uno al lado del otro: se ve el
+   combate mientras se elige el movimiento, sin tener que bajar. */
+@media (min-width: 1000px) {
+  .combate:has(> .arena) { grid-template-columns: minmax(0, 1fr) minmax(300px, 34%); align-items: start; }
+  .combate:has(> .arena) > .arena { grid-column: 1; grid-row: 1; aspect-ratio: 4 / 3; }
+  .combate:has(> .arena) .hud { width: min(42%, 300px); }
+  .combate:has(> .arena) > .zona-controles { grid-column: 2; grid-row: 1; }
+  .combate:has(> .arena) > .cronica { grid-column: 1 / -1; }
+  .combate:has(> .arena) .movimientos { grid-template-columns: 1fr; gap: 8px; }
+  .combate:has(> .arena) .mov { min-height: 56px; padding: 10px 14px; }
+  .combate:has(> .arena) .banquillo-lista { flex-direction: column; }
+  .partida-actual:fullscreen .combate:has(> .arena) > .arena { height: auto; aspect-ratio: 16 / 9; }
+}
+
+/* RF-36: en el móvil la arena es más baja para ver también los movimientos sin bajar. */
+@media (max-width: 640px) {
+  .combate > .arena { aspect-ratio: 1 / 1; }
+  .combate > .arena .lado-arriba .sprite { width: 36%; top: 17%; right: 7%; }
+  .combate > .arena .lado-abajo .sprite { width: 40%; bottom: 25%; left: 3%; }
+  .combate > .arena .lado-abajo .hud { bottom: 70px; width: 56%; }
+  .combate > .arena .hud { padding: 6px 9px 5px; }
+  .combate > .arena .hud-pie { margin-top: 3px; }
+  .combate > .arena .narrador-caja { padding: 12px 14px 9px; min-height: 0; }
+}

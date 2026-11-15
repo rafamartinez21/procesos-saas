@@ -265,9 +265,9 @@ function Salas({
 
   // RF-16 y RF-17: se delega en el combate de la partida del jugador.
   // Devuelven el id de la partida para que la capa de tiempo real avise a los dos jugadores.
-  this.elegirEquipo = function (email, ids) {
+  this.elegirEquipo = function (email, ids, aspectos) {
     const partida = combateDe(email);
-    partida.combate.elegirEquipo(email, ids);
+    partida.combate.elegirEquipo(email, ids, aspectos);
     presente(partida, email);
     jugarMaquina(partida);
     actualizarPlazo(partida);
@@ -324,6 +324,8 @@ function Salas({
     const leToca = partida.plazo && partida.estado === ESTADO_COMPLETA && pendientesDe(partida).includes(email);
     vista.plazoMs = leToca ? Math.max(0, partida.plazo - ahora()) : null;
     vista.ausencias = (partida.ausencias && partida.ausencias[email]) || 0;
+    // RF-37: cuánta gente mira el combate en directo.
+    vista.espectadores = partida.espectadores ? partida.espectadores.size : 0;
     if (partida.estado === ESTADO_TERMINADA) {
       const rival = partida.participantes.find((j) => j.email !== email);
       vista.revancha = {
@@ -504,7 +506,7 @@ function Salas({
     partida.espectadores = partida.espectadores || new Map();
     partida.espectadores.set(j.email, j);
     observando.set(j.email, partida.id);
-    return { id: partida.id, vista: partida.combate.vistaEspectador(nombresDe(partida)) };
+    return { id: partida.id, vista: this.vistaEspectador(partida.id) };
   };
 
   this.dejarDeObservar = function (email) {
@@ -523,7 +525,10 @@ function Salas({
   // Vista para espectadores de una partida, o null si ya no existe o no tiene combate.
   this.vistaEspectador = function (id) {
     const partida = partidas.get(id);
-    return partida && partida.combate ? partida.combate.vistaEspectador(nombresDe(partida)) : null;
+    if (!partida || !partida.combate) return null;
+    const vista = partida.combate.vistaEspectador(nombresDe(partida));
+    vista.espectadores = partida.espectadores ? partida.espectadores.size : 0; // RF-37
+    return vista;
   };
 
   // Emails de los jugadores (solo para la capa de tiempo real, que avisa a cada uno).

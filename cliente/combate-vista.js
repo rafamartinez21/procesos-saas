@@ -4,7 +4,7 @@
 // los clics a acciones, que se entregan a las funciones de "acciones".
 
 import { el } from "./dom.js";
-import { retrato, iconoElemento } from "./retratos.js";
+import { retrato, ASPECTOS, iconoElemento } from "./retratos.js";
 import { crearArena } from "./arena.js";
 
 const ELEMENTO = {
@@ -144,7 +144,7 @@ function barrasStats(c, maximos) {
   );
 }
 
-function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada }) {
+function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada, aspecto = "normal" }) {
   return el(
     "button",
     {
@@ -156,7 +156,7 @@ function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada }) {
       onclick: alPulsar,
     },
     orden ? el("span", { class: "orden", "aria-hidden": "true" }, String(orden)) : null,
-    retrato(c.id, { elemento: c.elemento, fondo: true, titulo: c.nombre, clase: "retrato retrato-carta" }),
+    retrato(c.id, { elemento: c.elemento, fondo: true, titulo: c.nombre, clase: "retrato retrato-carta", aspecto }),
     el("span", { class: "carta-nombre" }, el("strong", {}, c.nombre), etiquetaElemento(c.elemento)),
     el("p", { class: "descripcion" }, c.descripcion),
     barrasStats(c, maximos),
@@ -164,13 +164,36 @@ function cartaCriatura(c, { orden, maximos, alPulsar, bloqueada }) {
   );
 }
 
-function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj = null) {
+// RF-35: selector de aspecto de una criatura elegida (tres muestras).
+function selectorAspecto(c, actual, acciones) {
+  return el(
+    "div",
+    { class: "aspectos", role: "radiogroup", "aria-label": `Aspecto de ${c.nombre}` },
+    ...ASPECTOS.map((a) =>
+      el(
+        "button",
+        {
+          type: "button",
+          role: "radio",
+          class: `muestra muestra-${a.id}`,
+          "aria-checked": a.id === actual ? "true" : "false",
+          title: `${a.nombre}: ${a.descripcion}`,
+          "aria-label": `${a.nombre}: ${a.descripcion}`,
+          onclick: () => acciones.elegirAspecto(c.id, a.id),
+        },
+        retrato(c.id, { elemento: c.elemento, aspecto: a.id, clase: "retrato" })
+      )
+    )
+  );
+}
+
+function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj = null, aspectos = {}) {
   const porId = new Map(catalogo.map((c) => [c.id, c]));
   if (vista.yo.eleccionHecha) {
     return el(
       "div",
       { class: "combate espera" },
-      el("div", { class: "ranuras", style: "justify-content:center" }, ...vista.yo.equipo.map((c, i) => el("div", { class: "ranura llena", style: "width:96px;height:96px" }, el("span", { class: "num" }, String(i + 1)), retrato(c.id, { elemento: c.elemento, titulo: c.nombre, clase: "retrato", espejo: false })))),
+      el("div", { class: "ranuras", style: "justify-content:center" }, ...vista.yo.equipo.map((c, i) => el("div", { class: "ranura llena", style: "width:96px;height:96px" }, el("span", { class: "num" }, String(i + 1)), retrato(c.id, { elemento: c.elemento, aspecto: c.aspecto, titulo: c.nombre, clase: "retrato", espejo: false })))),
       el("h2", { style: "margin-top:16px" }, "Equipo listo"),
       el("p", { class: "suave" }, vista.rival.equipoElegido ? "Abriendo la arena…" : "Esperando a que tu rival elija a sus campeones…")
     );
@@ -182,14 +205,19 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj =
 
   const ranuras = [0, 1, 2].map((i) => {
     const c = porId.get(seleccion[i]);
-    return c
-      ? el(
-          "button",
-          { type: "button", class: "ranura llena", style: "padding:0;background:none;box-shadow:none", title: `Quitar a ${c.nombre}`, "aria-label": `Quitar a ${c.nombre}`, onclick: () => acciones.alternarSeleccion(c.id) },
-          el("span", { class: "num" }, String(i + 1)),
-          retrato(c.id, { elemento: c.elemento, titulo: c.nombre })
-        )
-      : el("div", { class: "ranura", "aria-hidden": "true" }, String(i + 1));
+    if (!c) return el("div", { class: "hueco" }, el("div", { class: "ranura", "aria-hidden": "true" }, String(i + 1)));
+    const aspecto = aspectos[c.id] || "normal";
+    return el(
+      "div",
+      { class: "hueco" },
+      el(
+        "button",
+        { type: "button", class: "ranura llena", style: "padding:0;background:none;box-shadow:none", title: `Quitar a ${c.nombre}`, "aria-label": `Quitar a ${c.nombre}`, onclick: () => acciones.alternarSeleccion(c.id) },
+        el("span", { class: "num" }, String(i + 1)),
+        retrato(c.id, { elemento: c.elemento, titulo: c.nombre, aspecto })
+      ),
+      selectorAspecto(c, aspecto, acciones)
+    );
   });
 
   return el(
@@ -212,7 +240,7 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj =
       { class: "rejilla-criaturas" },
       ...visibles.map((c) => {
         const i = seleccion.indexOf(c.id);
-        return cartaCriatura(c, { orden: i >= 0 ? i + 1 : 0, maximos, bloqueada: lleno, alPulsar: () => acciones.alternarSeleccion(c.id) });
+        return cartaCriatura(c, { orden: i >= 0 ? i + 1 : 0, maximos, bloqueada: lleno, aspecto: i >= 0 ? aspectos[c.id] : "normal", alPulsar: () => acciones.alternarSeleccion(c.id) });
       })
     ),
     avisoAusencias(vista),
@@ -221,7 +249,7 @@ function pantallaSeleccion(vista, catalogo, acciones, seleccion, filtro, reloj =
       { class: "bandeja" },
       reloj ? reloj.nodo : null,
       el("div", { class: "ranuras" }, ...ranuras),
-      el("span", { class: "texto-bandeja" }, lleno ? "La número 1 sale a combatir." : `Elige ${3 - seleccion.length} más.`),
+      el("span", { class: "texto-bandeja" }, lleno ? "La número 1 sale a combatir. Debajo de cada una eliges su aspecto." : `Elige ${3 - seleccion.length} más.`),
       el("button", { type: "button", disabled: !lleno, onclick: () => acciones.confirmarEquipo() }, "¡Al combate!")
     )
   );
@@ -268,7 +296,7 @@ function banquillo(vista, acciones, { titulo = "Cambiar a" } = {}) {
         return el(
           "button",
           { type: "button", class: "suplente", disabled: c.ps === 0, onclick: () => acciones.cambiar(i), "aria-label": `Cambiar a ${c.nombre}, ${c.ps} de ${c.psMax} PS` },
-          retrato(c.id, { elemento: c.elemento, clase: "retrato" }),
+          retrato(c.id, { elemento: c.elemento, aspecto: c.aspecto, clase: "retrato" }),
           el(
             "span",
             { class: "suplente-datos" },
@@ -348,6 +376,9 @@ function crearCronica(texto) {
   return { nodo, actualizar };
 }
 
+// Turno al que pertenecen los eventos de la vista (el último de la crónica).
+const turnoDe = (v) => (v.cronica && v.cronica.length ? v.cronica[v.cronica.length - 1].turno : null);
+
 const firmaDe = (v) => `${v.fase}|${v.turno}|${JSON.stringify(v.eventos)}`;
 
 // Controlador del combate de un jugador: mantiene la arena entre redibujados para que
@@ -395,8 +426,8 @@ export function crearControladorCombate({ acciones, contexto }) {
     if (v.fase === "seleccion") {
       arena = null;
       firmaMostrada = null;
-      const { catalogo, seleccion, filtro } = contexto();
-      nodo.replaceChildren(pantallaSeleccion(v, catalogo, acciones, seleccion, filtro, reloj));
+      const { catalogo, seleccion, filtro, aspectos } = contexto();
+      nodo.replaceChildren(pantallaSeleccion(v, catalogo, acciones, seleccion, filtro, reloj, aspectos));
       return;
     }
     // Si alguien abandonó antes de elegir equipos, solo hay resultado.
@@ -406,14 +437,18 @@ export function crearControladorCombate({ acciones, contexto }) {
       return;
     }
     if (!arena) {
-      arena = crearArena();
+      arena = crearArena({ cine: () => nodo.closest(".partida-actual") || nodo });
       nodo.replaceChildren(arena.nodo, zonaControles, cronica.nodo);
+      arena.escenario(v.escenario);
       sincronizar(v);
+      arena.espectadores(v.espectadores || 0);
+      if (!v.eventos.some((e) => e.tipo !== "cambio")) arena.anunciar("¡A luchar!", "inicio");
       firmaMostrada = firmaDe(v);
       arena.narrar(v.eventos.length ? textoEvento(v.eventos[v.eventos.length - 1]) : "¡Que empiece el combate!");
       pintarControles();
       return;
     }
+    arena.espectadores(v.espectadores || 0);
     const f = firmaDe(v);
     if (f === firmaMostrada || !v.eventos.length) {
       if (!reproduciendo) sincronizar(v);
@@ -426,7 +461,7 @@ export function crearControladorCombate({ acciones, contexto }) {
       pintarControles();
       const miArena = arena;
       try {
-        await miArena.reproducir(v.eventos, { ladoDe, texto: textoEvento, duenoDe: dueno });
+        await miArena.reproducir(v.eventos, { ladoDe, texto: textoEvento, duenoDe: dueno, turno: turnoDe(v) });
       } finally {
         reproduciendo = false;
         if (arena === miArena && ultima.yo.equipo && ultima.fase !== "seleccion") {
@@ -526,13 +561,16 @@ export function crearControladorEspectador({ salir }) {
       el("div", { class: "acciones" }, el("button", { type: "button", class: "secundario pequeno", onclick: salir }, "Dejar de mirar"))
     );
     if (!arena) {
-      arena = crearArena();
+      arena = crearArena({ cine: () => nodo });
       nodo.replaceChildren(cabecera, arena.nodo, estado, cronica.nodo);
+      arena.escenario(v.escenario);
       sincronizar(v);
+      arena.espectadores(v.espectadores || 0);
       firmaMostrada = firmaDe(v);
       arena.narrar(v.eventos.length ? textoEventoEspectador(v.eventos[v.eventos.length - 1]) : "");
       return pintarEstado();
     }
+    arena.espectadores(v.espectadores || 0);
     const f = firmaDe(v);
     if (f === firmaMostrada || !v.eventos.length) {
       if (!reproduciendo) sincronizar(v);
@@ -547,6 +585,7 @@ export function crearControladorEspectador({ salir }) {
           ladoDe: (ev) => posicion(ev.lado),
           texto: textoEventoEspectador,
           duenoDe: (p) => ultima.jugadores[p === "abajo" ? 0 : 1].nombre,
+          turno: turnoDe(v),
         });
       } finally {
         reproduciendo = false;
