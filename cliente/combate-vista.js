@@ -442,7 +442,7 @@ export function crearControladorCombate({ acciones, contexto }) {
       arena.escenario(v.escenario);
       sincronizar(v);
       arena.espectadores(v.espectadores || 0);
-      if (!v.eventos.some((e) => e.tipo !== "cambio")) arena.anunciar("¡A luchar!", "inicio");
+      if (v.fase === "combate" && v.turno === 1 && !v.cronica.length) arena.anunciar("¡A luchar!", "inicio");
       firmaMostrada = firmaDe(v);
       arena.narrar(v.eventos.length ? textoEvento(v.eventos[v.eventos.length - 1]) : "¡Que empiece el combate!");
       pintarControles();

@@ -106,7 +106,7 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
 
   // ---------- RF-16: elegir equipo ----------
   // aspectos (RF-35, opcional): un aspecto por criatura, en el mismo orden; si falta, "normal".
-  this.elegirEquipo = function (email, ids, aspectos = []) {
+  this.elegirEquipo = function (email, ids, aspectos) {
     const j = exigirJugador(email);
     exigirFase(FASE_SELECCION);
     if (j.equipo) throw new ErrorNegocio("EQUIPO_YA_ELEGIDO", "Ya has elegido tu equipo");
@@ -116,8 +116,9 @@ function Combate(emails, { aleatorio = Math.random } = {}) {
     if (new Set(ids).size !== ids.length) throw new ErrorNegocio("EQUIPO_INVALIDO", "No puedes repetir criaturas");
     const datos = ids.map((id) => (typeof id === "string" ? obtenerCriatura(id) : undefined));
     if (datos.some((d) => !d)) throw new ErrorNegocio("EQUIPO_INVALIDO", "Alguna criatura no existe");
-    if (!Array.isArray(aspectos)) throw new ErrorNegocio("ASPECTO_INVALIDO", "Los aspectos deben ser una lista");
-    const elegidos = ids.map((_, i) => (aspectos[i] === undefined || aspectos[i] === null ? ASPECTO_POR_DEFECTO : aspectos[i]));
+    const lista = aspectos === undefined || aspectos === null ? [] : aspectos;
+    if (!Array.isArray(lista)) throw new ErrorNegocio("ASPECTO_INVALIDO", "Los aspectos deben ser una lista");
+    const elegidos = ids.map((_, i) => (lista[i] === undefined || lista[i] === null ? ASPECTO_POR_DEFECTO : lista[i]));
     if (elegidos.some((a) => !ASPECTOS.includes(a))) throw new ErrorNegocio("ASPECTO_INVALIDO", "Ese aspecto no existe");
     j.equipo = datos.map((d, i) => ({ ...nuevaInstancia(d), aspecto: elegidos[i] }));
     if ([...jugadores.values()].every((x) => x.equipo)) {

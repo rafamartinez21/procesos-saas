@@ -162,7 +162,14 @@ export function crearArena({ cine = () => null } = {}) {
     if (!misma) l.cuerpo.replaceChildren(retrato(criatura.id, { elemento: criatura.elemento, aspecto: criatura.aspecto, espejo: posicion === "arriba", titulo: criatura.nombre }));
     l.nombre.textContent = criatura.nombre;
     l.dueno.textContent = dueno;
+    // Con una criatura nueva la barra se coloca de golpe: la marca del trozo perdido es
+    // solo para el daño recibido, no para la diferencia con la criatura anterior.
+    if (!misma) l.resto.style.transition = "none";
     pintarPs(l, criatura.ps);
+    if (!misma) {
+      void l.resto.offsetWidth;
+      l.resto.style.transition = "";
+    }
     pintarEtiquetas(l);
     l.sprite.classList.toggle("caida", criatura.ps <= 0);
     l.cuerpo.style.opacity = "";

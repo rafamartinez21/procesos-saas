@@ -500,8 +500,9 @@ test("RF-31: los movimientos de apoyo no tienen eficacia en la vista", () => {
 test("RF-35: cada criatura lleva el aspecto elegido; si no se elige, el normal", () => {
   const c = new Combate([ANA, LUIS], { aleatorio: () => 0.5 });
   c.elegirEquipo(ANA, ["pirolince", "brason", "voltarda"], ["astral", null, "sombra"]);
-  c.elegirEquipo(LUIS, ["marejon", "musgolem", "rocadonte"]);
+  c.elegirEquipo(LUIS, ["marejon", "musgolem", "rocadonte"], null);
   assert.deepEqual(c.vista(ANA).yo.equipo.map((x) => x.aspecto), ["astral", "normal", "sombra"]);
+  assert.deepEqual(c.vista(LUIS).yo.equipo.map((x) => x.aspecto), ["normal", "normal", "normal"]);
   assert.equal(c.vista(LUIS).rival.activa.aspecto, "astral");
   assert.equal(c.vista(ANA).rival.activa.aspecto, "normal");
   assert.equal(c.vistaEspectador({ [ANA]: "Ana", [LUIS]: "Luis" }).jugadores[0].activa.aspecto, "astral");

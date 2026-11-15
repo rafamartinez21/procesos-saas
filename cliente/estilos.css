@@ -749,7 +749,7 @@ button.latiendo { animation: latir 1.2s ease-in-out infinite; }
 @keyframes peligro { 50% { box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.25), 0 10px 24px rgba(0, 0, 0, 0.45); } }
 
 /* Modo cine: la partida a pantalla completa. */
-.partida-actual:fullscreen, .arena:fullscreen { background: var(--noche); padding: 16px; overflow-y: auto; }
+.partida-actual:fullscreen, .arena:fullscreen { background: var(--noche); padding: 16px; overflow-y: auto; align-content: start; }
 .partida-actual:fullscreen .arena { aspect-ratio: auto; height: min(72vh, calc(100vw * 9 / 16)); max-width: none; }
 .arena:fullscreen { border-radius: 0; aspect-ratio: auto; }
 
@@ -763,7 +763,7 @@ button.latiendo { animation: latir 1.2s ease-in-out infinite; }
   .lado-abajo .hud { bottom: 84px; }
   .narrador { font-size: 0.84rem; }
   .arena-esquina { top: 8px; right: 10px; }
-  .muestra { width: 22px; height: 22px; border-radius: 6px; }
+  .muestra { width: 28px; height: 28px; }
 }
 
 .arena[data-bioma] .lado-arriba .hud { top: 48px; }
@@ -791,4 +791,19 @@ button.latiendo { animation: latir 1.2s ease-in-out infinite; }
   .combate > .arena .hud { padding: 6px 9px 5px; }
   .combate > .arena .hud-pie { margin-top: 3px; }
   .combate > .arena .narrador-caja { padding: 12px 14px 9px; min-height: 0; }
+}
+
+/* La bandeja del equipo se queda fija abajo de la pantalla mientras se eligen criaturas. El
+   desenfoque del panel creaba un bloque contenedor propio y la dejaba al final de la página,
+   así que el panel que la contiene no lo lleva. */
+.panel:has(.bandeja) { backdrop-filter: none; background: rgba(20, 25, 60, 0.9); }
+.combate:has(> .bandeja) { padding-bottom: 150px; }
+@media (max-width: 640px) {
+  .combate:has(> .bandeja) { padding-bottom: 190px; }
+  .bandeja { gap: 8px 10px; padding: 8px 10px; border-radius: 16px; bottom: 8px; }
+  .bandeja .texto-bandeja { display: none; }
+  .bandeja .reloj { order: 0; padding: 4px 9px; }
+  .bandeja .reloj-barra { width: 34px; }
+  .bandeja .ranuras { gap: 8px; }
+  .bandeja .ranura { width: 50px; height: 50px; }
 }
