@@ -212,3 +212,9 @@ timestamp: 2026-10-28
 - **Por qué:** el tutorial del curso lo incluye en el Sprint 2 (apartado 2.4) y ahorra un paso al usuario que ya tiene sesión en Google. Validar el token en el servidor es imprescindible: el navegador podría enviar cualquier cosa. Usar `tokeninfo` evita añadir una dependencia para comprobar firmas JWT; a cambio hace una petición a Google por inicio de sesión, que es suficiente para este proyecto. No se usa passport, igual que en D-17.
 - **Estado:** vigente. Requiere que la URL pública esté en «Orígenes autorizados de JavaScript» del cliente OAuth en Google Cloud; si no lo está, Google no muestra One Tap y queda el botón de siempre.
 
+## D-35 Sin JWT propio ni inicio de sesión automático al confirmar la cuenta
+
+- **Qué se decidió:** las rutas protegidas se siguen protegiendo con la sesión en el servidor y la cookie `HttpOnly` (D-04) y el middleware `exigirSesion`; la aplicación no emite tokens JWT propios. Al confirmar la cuenta desde el enlace del correo (`GET /api/confirmar`), la página vuelve a la pantalla de acceso con el aviso de cuenta confirmada y el usuario inicia sesión con su contraseña; no se abre la sesión automáticamente.
+- **Por qué:** el tutorial del Sprint 2 propone JWT como mejora opcional (apartado 2.10); su objetivo, que solo un usuario con sesión use las rutas protegidas, ya se cumple con la sesión en el servidor, que además se puede invalidar al salir (un JWT sigue siendo válido hasta que caduca). No abrir la sesión desde el enlace evita que quien tenga acceso al correo, o a un enlace reenviado, entre en la cuenta sin conocer la contraseña; el enlace sigue siendo de un solo uso (D-16).
+- **Estado:** vigente. Revisión del Sprint 2 contra el tutorial (apartados 2.1 a 2.10) hecha el 2026-11-17.
+

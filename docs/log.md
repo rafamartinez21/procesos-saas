@@ -4,6 +4,8 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-17 | Revisión del Sprint 2 contra el tutorial: One Tap comprobado en producción y D-35 | [PR #46](https://github.com/rafamartinez21/procesos-saas/pull/46) |
+| 2026-11-17 | Etiqueta `hito-13`: Google One Tap | [hito-13](https://github.com/rafamartinez21/procesos-saas/tree/hito-13) |
 | 2026-11-17 | Google One Tap (apartado 2.4 del tutorial del Sprint 2, D-34) | [PR #45](https://github.com/rafamartinez21/procesos-saas/pull/45) |
 | 2026-11-15 | README y procesos al día con el Sprint 3 (hitos 9 a 12, 43 pull requests) | [PR #44](https://github.com/rafamartinez21/procesos-saas/pull/44) |
 | 2026-11-15 | Etiqueta `hito-12` | [hito-12](https://github.com/rafamartinez21/procesos-saas/tree/hito-12) |
