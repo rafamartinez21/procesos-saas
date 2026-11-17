@@ -130,6 +130,8 @@ La lógica (`modelo.js`) no sabe cómo se entrega el enlace: recibe una función
 3. El servidor cambia el código por el perfil (email verificado y nombre) y la lógica decide: si el email es nuevo, crea la cuenta como usuario y ya activa; si se creó con Google, entra; si es una cuenta local, se rechaza y se pide entrar con contraseña (D-18).
 4. La sesión se crea igual que en el inicio de sesión local (cookie `HttpOnly`).
 
+**Google One Tap** (D-34): en la pantalla de acceso, Google ofrece entrar con la cuenta que ya está abierta en el navegador. El token de identidad que da Google se envía a `POST /api/auth/google/one-tap` y el servidor lo verifica (destinatario, emisor, caducidad y email verificado) antes de iniciar sesión. Para verlo en producción, la URL pública tiene que estar en «Orígenes autorizados de JavaScript» del cliente OAuth en Google Cloud.
+
 ## Roles y registro de actividad
 
 - Dos roles: `usuario` y `admin`. Listar usuarios y comprobar si uno está activo es solo del administrador; eliminar: el administrador a cualquiera y un usuario solo a sí mismo. Se comprueba en el servidor (`modelo.js`) y el rol se lee siempre de la base de datos, nunca de lo que envíe el cliente.

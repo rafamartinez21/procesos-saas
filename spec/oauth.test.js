@@ -8,7 +8,7 @@ const { Sistema } = require("../servidor/modelo.js");
 const { CadMemoria } = require("../servidor/cad-memoria.js");
 const { crearApp } = require("../servidor/api.js");
 const { registroSilencioso } = require("../servidor/registro.js");
-const { crearOAuthGoogle, URL_TOKEN, URL_PERFIL } = require("../servidor/oauth-google.js");
+const { crearOAuthGoogle, URL_TOKEN, URL_PERFIL, URL_TOKENINFO } = require("../servidor/oauth-google.js");
 
 const CLAVE = "claveSegura1";
 
@@ -122,6 +122,11 @@ before(async () => {
       if (code !== "codigo-bueno") throw new Error("código no válido");
       return perfilDevuelto;
     },
+    clientId: "id-prueba.apps.googleusercontent.com",
+    verificarCredencial: async (credencial) => {
+      if (credencial !== "credencial-buena-de-google") throw new Error("credencial no válida");
+      return perfilDevuelto;
+    },
   };
   const s = new Sistema(new CadMemoria(), { autoConfirmar: true });
   await s.registrarUsuario({ email: "local@test.es", password: CLAVE });
@@ -206,6 +211,95 @@ test("sin Google configurado, /api/auth/google avisa de que no está disponible"
   try {
     const res = await fetch(`http://127.0.0.1:${srv.address().port}/api/auth/google`, { redirect: "manual" });
     assert.equal(res.headers.get("location"), "/?oauth=no-disponible");
+  } finally {
+    srv.close();
+  }
+});
+
+// ---------- Google One Tap (apartado 2.4 del tutorial) ----------
+
+const AHORA = Date.UTC(2026, 10, 17, 12, 0, 0);
+const CREDENCIAL = "eyJhbGciOiJSUzI1NiJ9.cuerpo-de-prueba.firma-de-prueba";
+function googleFalso(respuesta, { ok = true, estado = 200 } = {}) {
+  const llamadas = [];
+  const fetch = async (url) => {
+    llamadas.push(url);
+    return { ok, status: estado, json: async () => respuesta };
+  };
+  return { llamadas, g: crearOAuthGoogle({ clientId: "id-prueba", clientSecret: "secreto", fetch, ahora: () => AHORA }) };
+}
+const tokenValido = (extra = {}) => ({ aud: "id-prueba", iss: "https://accounts.google.com", exp: String(AHORA / 1000 + 600), email: "ana@gmail.com", email_verified: "true", name: "Ana", ...extra });
+
+test("One Tap: una credencial válida de Google da el perfil, y se comprueba con tokeninfo", async () => {
+  const { g, llamadas } = googleFalso(tokenValido());
+  assert.deepEqual(await g.verificarCredencial(CREDENCIAL), { email: "ana@gmail.com", nombre: "Ana", emailVerificado: true });
+  const url = new URL(llamadas[0]);
+  assert.equal(`${url.origin}${url.pathname}`, URL_TOKENINFO);
+  assert.equal(url.searchParams.get("id_token"), CREDENCIAL);
+  assert.equal(g.clientId, "id-prueba");
+});
+
+test("[error] One Tap: se rechaza una credencial para otra aplicación, de otro emisor, caducada o que Google no acepta", async () => {
+  const casos = [
+    googleFalso(tokenValido({ aud: "otra-app" })).g,
+    googleFalso(tokenValido({ iss: "https://malo.test" })).g,
+    googleFalso(tokenValido({ exp: String(AHORA / 1000 - 1) })).g,
+    googleFalso({ error: "invalid_token" }, { ok: false, estado: 400 }).g,
+  ];
+  for (const g of casos) await assert.rejects(g.verificarCredencial(CREDENCIAL), (err) => err.credencialInvalida === true);
+  const { g, llamadas } = googleFalso(tokenValido());
+  await assert.rejects(g.verificarCredencial(123), (err) => err.credencialInvalida === true);
+  await assert.rejects(g.verificarCredencial(""), (err) => err.credencialInvalida === true);
+  assert.equal(llamadas.length, 0, "sin una credencial con forma de token no se llama a Google");
+});
+
+test("One Tap: un email que Google no ha verificado llega como no verificado (la lógica lo rechaza)", async () => {
+  const { g } = googleFalso(tokenValido({ email_verified: "false" }));
+  assert.equal((await g.verificarCredencial(CREDENCIAL)).emailVerificado, false);
+});
+
+test("GET /api/auth/google/one-tap da el id de cliente que necesita la página", async () => {
+  const res = await fetch(`${base}/api/auth/google/one-tap`);
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { clientId: "id-prueba.apps.googleusercontent.com" });
+});
+
+test("One Tap por la API: con una credencial buena se crea la sesión con la cookie HttpOnly", async () => {
+  perfilDevuelto = { email: "onetap@gmail.com", nombre: "Uno", emailVerificado: true };
+  const res = await fetch(`${base}/api/auth/google/one-tap`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ credential: "credencial-buena-de-google" }) });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).email, "onetap@gmail.com");
+  const sid = res.headers.getSetCookie().find((c) => c.startsWith("sid="));
+  assert.match(sid, /HttpOnly/);
+  const yo = await fetch(`${base}/api/sesion`, { headers: { cookie: sid.split(";")[0] } });
+  assert.equal((await yo.json()).email, "onetap@gmail.com");
+});
+
+test("[error] One Tap por la API: credencial inventada (401), email con cuenta local (409) y email sin verificar (403), sin sesión", async () => {
+  const enviar = (credential) => fetch(`${base}/api/auth/google/one-tap`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ credential }) });
+  let res = await enviar("inventada");
+  assert.equal(res.status, 401);
+  assert.equal((await res.json()).error, "CREDENCIAL_INVALIDA");
+  assert.equal(res.headers.getSetCookie().some((c) => c.startsWith("sid=")), false);
+  perfilDevuelto = { email: "local@test.es", nombre: "", emailVerificado: true };
+  res = await enviar("credencial-buena-de-google");
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error, "CUENTA_LOCAL_EXISTENTE");
+  perfilDevuelto = { email: "sinverificar@gmail.com", nombre: "", emailVerificado: false };
+  res = await enviar("credencial-buena-de-google");
+  assert.equal(res.status, 403);
+  assert.equal(res.headers.getSetCookie().some((c) => c.startsWith("sid=")), false);
+});
+
+test("sin Google configurado, One Tap responde 404 y la página no lo muestra", async () => {
+  const app = crearApp(new Sistema(new CadMemoria()), { registro: registroSilencioso });
+  const srv = await new Promise((resolve) => {
+    const s = app.listen(0, () => resolve(s));
+  });
+  try {
+    const url = `http://127.0.0.1:${srv.address().port}/api/auth/google/one-tap`;
+    assert.equal((await fetch(url)).status, 404);
+    assert.equal((await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status, 404);
   } finally {
     srv.close();
   }

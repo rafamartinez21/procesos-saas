@@ -89,8 +89,59 @@ function logoGoogle() {
   return svg;
 }
 
+// Google One Tap (apartado 2.4 del tutorial): en la pantalla de acceso, Google ofrece entrar
+// con la cuenta que ya tiene abierta en el navegador, sin pasar por su página. La librería
+// de Google se carga solo aquí y solo si el servidor tiene Google configurado.
+const URL_GSI = "https://accounts.google.com/gsi/client";
+let gsiCargando = null;
+function cargarGsi() {
+  if (window.google && window.google.accounts && window.google.accounts.id) return Promise.resolve();
+  if (!gsiCargando) {
+    gsiCargando = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = URL_GSI;
+      script.async = true;
+      script.onload = resolve;
+      script.onerror = () => {
+        gsiCargando = null;
+        reject(new Error("No se pudo cargar Google One Tap"));
+      };
+      document.head.append(script);
+    });
+  }
+  return gsiCargando;
+}
+
+async function ofrecerOneTap() {
+  try {
+    const config = await ClienteApi.configuracionOneTap();
+    if (!config || !config.clientId) return;
+    await cargarGsi();
+    window.google.accounts.id.initialize({
+      client_id: config.clientId,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      context: "signin",
+      use_fedcm_for_prompt: true,
+      callback: async ({ credential }) => {
+        try {
+          await ClienteApi.iniciarSesionOneTap(credential);
+          mostrarMensaje("");
+          await arrancar();
+        } catch (err) {
+          mostrarError(err);
+        }
+      },
+    });
+    window.google.accounts.id.prompt();
+  } catch {
+    // Sin One Tap (bloqueado, sin red o sin Google configurado) sigue el botón de siempre.
+  }
+}
+
 function pantallaAcceso() {
   barraUsuario.replaceChildren();
+  ofrecerOneTap();
   let pestana = "entrar";
 
   const formLogin = el(
@@ -823,6 +874,7 @@ function mensajeDeConfirmacion() {
 
 async function arrancar(limpiarMensaje = true) {
   if (limpiarMensaje) mostrarMensaje("");
+  if (window.google && window.google.accounts && window.google.accounts.id) window.google.accounts.id.cancel();
   try {
     const usuario = await ClienteApi.sesionActual();
     if (usuario) await pantallaPrincipal(usuario);

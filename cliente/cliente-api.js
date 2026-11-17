@@ -53,6 +53,15 @@ export const ClienteApi = {
   reenviarConfirmacion: (email) => peticion("POST", "/api/confirmacion", { email }),
   // OAuth: es una navegación completa (Google tiene que mostrar su página), no un fetch.
   iniciarSesionGoogle: () => window.location.assign("/api/auth/google"),
+  // Google One Tap: id de cliente (o null si Google no está configurado) y envío del token.
+  configuracionOneTap: async () => {
+    try {
+      return await peticion("GET", "/api/auth/google/one-tap");
+    } catch {
+      return null;
+    }
+  },
+  iniciarSesionOneTap: (credential) => peticion("POST", "/api/auth/google/one-tap", { credential }),
   cerrarSesion: () => peticion("DELETE", "/api/sesion"),
   // Devuelve el usuario con sesión, o null si no hay sesión (no es un error: es el estado normal al entrar).
   sesionActual: async () => {

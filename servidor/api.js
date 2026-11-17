@@ -175,6 +175,33 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
     }
   });
 
+  // ---------- Google One Tap (apartado 2.4 del tutorial) ----------
+  // El navegador necesita el id de cliente para mostrar One Tap; si Google no está
+  // configurado, responde 404 y la página simplemente no lo muestra.
+  app.get("/api/auth/google/one-tap", (req, res) => {
+    if (!oauthGoogle) return res.status(404).json({ error: "NO_DISPONIBLE", mensaje: "El inicio de sesión con Google no está disponible" });
+    res.json({ clientId: oauthGoogle.clientId });
+  });
+
+  // One Tap entrega al navegador un token de identidad de Google; el servidor lo verifica y
+  // la lógica decide igual que en el flujo con redirección (crear, entrar o rechazar, D-18).
+  app.post("/api/auth/google/one-tap", asincrono(async (req, res) => {
+    if (!oauthGoogle) return res.status(404).json({ error: "NO_DISPONIBLE", mensaje: "El inicio de sesión con Google no está disponible" });
+    let perfil;
+    try {
+      perfil = await oauthGoogle.verificarCredencial(req.body && req.body.credential);
+    } catch (err) {
+      registro.aviso("one tap rechazado", { motivo: String(err && err.message) });
+      return res.status(401).json({ error: "CREDENCIAL_INVALIDA", mensaje: "No se pudo verificar tu cuenta de Google. Inténtalo de nuevo." });
+    }
+    const usuario = await sistema.iniciarSesionExterna({ ...perfil, proveedor: "google" });
+    await sesiones.destruir(req.idSesion);
+    const id = await sesiones.crear(usuario.email);
+    registro.info("inicio de sesion", { email: usuario.email, rol: usuario.rol, proveedor: "google-one-tap" });
+    res.setHeader("Set-Cookie", cookieDeSesion(id, { segura: req.secure, duracionMs: sesiones.duracionMs }));
+    res.json(usuario);
+  }));
+
   // Iniciar sesión
   app.post("/api/sesion", asincrono(async (req, res) => {
     const usuario = await sistema.iniciarSesion(req.body);

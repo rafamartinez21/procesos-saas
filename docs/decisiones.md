@@ -206,3 +206,9 @@ timestamp: 2026-10-28
 - **Por qué:** cientos de partículas como nodos del DOM serían lentas; en un canvas cuestan poco. El paraje tiene que ser el mismo para los dos jugadores y el público, y no cambiar al recargar, así que no puede elegirlo cada cliente. No se usa el generador de azar del combate para no cambiar la secuencia de números de la que dependen las pruebas de daño y estados.
 - **Estado:** vigente.
 
+## D-34 Google One Tap con verificación del token en el servidor
+
+- **Qué se decidió:** además del botón «Entrar con Google» (redirección, D-17), la pantalla de acceso ofrece Google One Tap. La librería de Google (`accounts.google.com/gsi/client`) se carga solo en esa pantalla y solo si el servidor tiene Google configurado (`GET /api/auth/google/one-tap` da el id de cliente, que es público). Google entrega al navegador un token de identidad; el cliente lo envía a `POST /api/auth/google/one-tap` y el servidor lo comprueba con el endpoint `tokeninfo` de Google (firma y caducidad) y además exige `aud` igual a nuestro id de cliente, `iss` de Google y email verificado. Después decide la misma lógica que en el otro flujo (`iniciarSesionExterna`, D-18) y se crea la sesión con la cookie `HttpOnly` de siempre.
+- **Por qué:** el tutorial del curso lo incluye en el Sprint 2 (apartado 2.4) y ahorra un paso al usuario que ya tiene sesión en Google. Validar el token en el servidor es imprescindible: el navegador podría enviar cualquier cosa. Usar `tokeninfo` evita añadir una dependencia para comprobar firmas JWT; a cambio hace una petición a Google por inicio de sesión, que es suficiente para este proyecto. No se usa passport, igual que en D-17.
+- **Estado:** vigente. Requiere que la URL pública esté en «Orígenes autorizados de JavaScript» del cliente OAuth en Google Cloud; si no lo está, Google no muestra One Tap y queda el botón de siempre.
+
