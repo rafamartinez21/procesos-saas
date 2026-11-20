@@ -113,6 +113,19 @@ test("las estadísticas cuentan partidas, porcentaje de victorias y racha actual
   assert.equal(e.elo, (await cad.buscarJugador(ana.email)).elo);
 });
 
+test("la racha de victorias cuenta más allá de las 5 partidas recientes (#48)", async () => {
+  for (let i = 0; i < 8; i++) await resultado(ana, luis, ana);
+  let e = await progreso.estadisticas(ana.email, "Ana");
+  assert.equal(e.rachaVictorias, 8);
+  assert.equal(e.recientes.length, 5);
+  await resultado(ana, luis, luis);
+  e = await progreso.estadisticas(ana.email, "Ana");
+  assert.equal(e.rachaVictorias, 0);
+  await resultado(ana, luis, null);
+  e = await progreso.estadisticas(ana.email, "Ana");
+  assert.equal(e.rachaVictorias, 0);
+});
+
 test("quien aún no ha jugado empieza con 1000 de ELO y sin partidas", async () => {
   const e = await progreso.estadisticas("nuevo@test.es", "Nuevo");
   assert.deepEqual(
