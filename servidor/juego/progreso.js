@@ -44,6 +44,8 @@ function Progreso(cad, { ahora = () => Date.now() } = {}) {
       ganadas: j.ganadas + (r === 1 ? 1 : 0),
       perdidas: j.perdidas + (r === 0 ? 1 : 0),
       empates: j.empates + (r === 0.5 ? 1 : 0),
+      // La racha se guarda con el jugador: así no depende de cuántas partidas se muestran.
+      rachaVictorias: r === 1 ? (j.rachaVictorias || 0) + 1 : 0,
     });
     await cad.guardarJugador(contar(ja, resultadoA));
     await cad.guardarJugador(contar(jb, 1 - resultadoA));
@@ -98,10 +100,14 @@ function Progreso(cad, { ahora = () => Date.now() } = {}) {
   this.estadisticas = async function (email, nombre) {
     const j = (await cad.buscarJugador(email)) || jugadorNuevo(email, nombre);
     const recientes = await this.historial(email, 5);
-    let racha = 0;
-    for (const p of recientes) {
-      if (p.resultado !== "victoria") break;
-      racha += 1;
+    // Jugadores guardados antes de existir el campo: se deduce de las partidas recientes.
+    let racha = j.rachaVictorias;
+    if (racha === undefined) {
+      racha = 0;
+      for (const p of recientes) {
+        if (p.resultado !== "victoria") break;
+        racha += 1;
+      }
     }
     const total = jugadas(j);
     return {
