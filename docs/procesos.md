@@ -17,7 +17,7 @@ Se sigue GitHub Flow ([README](../README.md#flujo-de-trabajo)):
 4. Al terminar cada hito se pone una etiqueta en `main`: de `hito-1` a `hito-13`. La de `hito-4` se puso al cerrar RF-04 en el Sprint 2 (ver [sprint-1.md](sprint-1.md)).
 
 **Evidencia:**
-- 49 pull requests (`gh pr list --state all`), a 25/11/2026: 48 integrados y el #52, de una compañera desde un fork, abierto y en revisión. El PR #26 se integró antes de que arrancara su CI, que después pasó en verde ([log](log.md)).
+- 50 pull requests (`gh pr list --state all`), a 25/11/2026: 49 integrados (hasta el #53) y el #52, de una compañera desde un fork, abierto y en revisión. El PR #26 se integró antes de que arrancara su CI, que después pasó en verde ([log](log.md)).
 - En `git log --first-parent main`, todos los commits vienen de un pull request (merge o *squash*), salvo el commit inicial `583a961`.
 
 Por verificar: si la protección de la rama `main` está activada (Settings → Branches en GitHub).
@@ -33,7 +33,7 @@ Por verificar: si la protección de la rama `main` está activada (Settings → 
   3. instala las dependencias con `npm ci`, que respeta las versiones exactas de `package-lock.json`;
   4. ejecuta `npm test`.
 - **Pruebas:** `npm test` ejecuta 330. Las de MongoDB usan `mongodb-memory-server` y las de tiempo real arrancan el servidor en un puerto libre con el cliente oficial de Socket.IO, así que la CI no necesita secretos ni acceso a Atlas.
-- **Resultados:** las 102 ejecuciones terminadas están en verde (`gh run list --limit 300`), a 25/11/2026. La del PR #52 espera a que se apruebe, porque viene de un fork.
+- **Resultados:** todas las ejecuciones terminadas están en verde (`gh run list --limit 300`): 102 antes de este cambio, a 25/11/2026. La del PR #52 espera a que se apruebe, porque viene de un fork.
 
 ## Despliegue continuo
 

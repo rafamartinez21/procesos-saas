@@ -4,6 +4,7 @@ Fechas en UTC: integración de los pull requests según `gh pr list` (`mergedAt`
 
 | Fecha | Evento | Enlace |
 |---|---|---|
+| 2026-11-25 | OKF: cierre del Sprint 2 con la revisión contra el tutorial (hito 13) y cifras al día (330 pruebas, `hito-13`) | [PR #53](https://github.com/rafamartinez21/procesos-saas/pull/53) |
 | 2026-11-17 | RF-02: envío real del correo de confirmación comprobado en producción | [PR #47](https://github.com/rafamartinez21/procesos-saas/pull/47) |
 | 2026-11-17 | Revisión del Sprint 2 contra el tutorial: One Tap comprobado en producción y D-35 | [PR #46](https://github.com/rafamartinez21/procesos-saas/pull/46) |
 | 2026-11-17 | Etiqueta `hito-13`: Google One Tap | [hito-13](https://github.com/rafamartinez21/procesos-saas/tree/hito-13) |
