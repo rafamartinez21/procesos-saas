@@ -56,6 +56,17 @@ async function registrarYEntrar(email) {
   return r.cookie;
 }
 
+test("las respuestas llevan cabeceras de seguridad y no anuncian Express", async () => {
+  for (const ruta of ["/", "/api/salud"]) {
+    const res = await fetch(base + ruta);
+    assert.equal(res.headers.get("x-powered-by"), null, ruta);
+    assert.equal(res.headers.get("x-content-type-options"), "nosniff", ruta);
+    assert.equal(res.headers.get("x-frame-options"), "DENY", ruta);
+    assert.equal(res.headers.get("referrer-policy"), "same-origin", ruta);
+    await res.arrayBuffer();
+  }
+});
+
 test("la API responde y sirve la página", async () => {
   assert.equal((await llamar("GET", "/api/salud")).estado, 200);
   const res = await fetch(base + "/");

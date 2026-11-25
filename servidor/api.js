@@ -36,6 +36,20 @@ function crearApp(sistema, { sesiones = new Sesiones(), registro = crearRegistro
   // Cloud Run está detrás de un proxy que termina el HTTPS. Con esto, req.secure es
   // true en producción y la cookie se marca como Secure.
   app.set("trust proxy", 1);
+
+  // No anunciar el framework y enviar cabeceras de seguridad básicas en todas las respuestas
+  // (también en los ficheros estáticos, por eso van antes de express.static). No se activa
+  // una política CSP: habría que probarla con socket.io y el inicio de sesión con Google.
+  app.disable("x-powered-by");
+  app.use((req, res, next) => {
+    res.set({
+      "X-Content-Type-Options": "nosniff",
+      "X-Frame-Options": "DENY",
+      "Referrer-Policy": "same-origin",
+    });
+    next();
+  });
+
   app.use(express.json());
 
   // El backend sirve el frontend (mismo origen).
