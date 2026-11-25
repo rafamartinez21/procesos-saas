@@ -1,8 +1,8 @@
 ---
 type: Sprint
 title: Sprint 2
-description: Objetivo del Sprint 2 (el juego Ecos de Aetheria), hitos 5 a 8 con sus requisitos, lo hecho en cada hito y retrospectiva.
-timestamp: 2026-11-05
+description: Objetivo del Sprint 2 (el juego Ecos de Aetheria), hitos 5 a 8 con sus requisitos, lo hecho en cada hito, la revisión contra el tutorial (hito 13) y retrospectiva.
+timestamp: 2026-11-25
 ---
 
 # Sprint 2
@@ -13,7 +13,7 @@ La lógica del juego vive en la capa de lógica del servidor, que decide todo (D
 
 ## Hitos
 
-Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el Sprint 1.
+Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el Sprint 1. La revisión contra el tutorial añadió Google One Tap con la etiqueta `hito-13` (ver más abajo).
 
 ### Hito 5: salas de partida en tiempo real
 
@@ -82,6 +82,11 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 - **Qué se hizo:** rival máquina que juega con la misma información que un jugador (D-25), chat, modo espectador (D-26) y reconexión.
 - **PR y etiqueta:** [PR #27](https://github.com/rafamartinez21/procesos-saas/pull/27) a [PR #30](https://github.com/rafamartinez21/procesos-saas/pull/30). Etiqueta `hito-8`.
 
+### Revisión contra el tutorial (hito 13)
+
+- **Qué se hizo:** el 2026-11-17 se comprobaron uno a uno los apartados 2.1 a 2.10 del tutorial del Sprint 2 contra el código, las pruebas y la producción. Todo estaba cubierto salvo Google One Tap (apartado 2.4), que se añadió con 7 pruebas nuevas (D-34). La mejora opcional con JWT (apartado 2.10) se descarta de forma justificada (D-35). También se comprobó en producción el envío real del correo de confirmación de RF-02.
+- **PR y etiqueta:** [PR #45](https://github.com/rafamartinez21/procesos-saas/pull/45) (One Tap), [PR #46](https://github.com/rafamartinez21/procesos-saas/pull/46) (revisión y D-35) y [PR #47](https://github.com/rafamartinez21/procesos-saas/pull/47) (correo de RF-02). Etiqueta `hito-13`.
+
 ## Retrospectiva
 
 - **Qué funcionó:**
@@ -90,7 +95,9 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
   - la prueba de 40 partidas máquina contra máquina recorre 349 turnos (825 acciones) y confirma que la máquina nunca hace una acción inválida.
 - **Qué mejorar:**
   - el PR #26 se integró sin esperar a la CI;
+  - el plan no se contrastó con el tutorial al empezar el sprint: One Tap se detectó en la revisión final;
   - las partidas en curso viven en memoria (D-21), así que el servicio necesita una sola instancia y un reinicio termina las partidas.
+- **Cifras:** 19 de 19 PBI hechos y comprobados en producción; 21 pull requests (#16 a #33 y #45 a #47); 267 pruebas al cierre del sprint, más 7 de One Tap; etiquetas `hito-4` a `hito-8` y `hito-13`.
 - **Comprobado en la consola de Cloud Run:** número máximo de instancias igual a 1 (D-21).
 - **Por verificar:**
   - en Cloud Run, tiempo máximo de petición: los WebSockets se cortan al llegar a él, aunque se recuperan con la reconexión (RF-24).
@@ -99,5 +106,5 @@ Cada hito termina con una etiqueta en `main` (`hito-5` … `hito-8`), como en el
 
 | ID | Requisito | Estado | Qué falta |
 |---|---|---|---|
-| RF-02 | Confirmación de cuenta por correo | hecho | Correo con Brevo (D-16) y reenvío del enlace. Ver [requisitos.md](requisitos.md). |
-| RF-04 | Inicio de sesión con OAuth | hecho | Google (D-17); un email con cuenta local se rechaza (D-18). Credenciales de Google en Cloud Run comprobadas el 2026-11-09; con eso se cierra el hito 4 (etiqueta `hito-4`). |
+| RF-02 | Confirmación de cuenta por correo | hecho | Correo con Brevo (D-16) y reenvío del enlace. Envío real comprobado en producción el 2026-11-17 (PR #47). Ver [requisitos.md](requisitos.md). |
+| RF-04 | Inicio de sesión con OAuth | hecho | Google (D-17); un email con cuenta local se rechaza (D-18). Credenciales de Google en Cloud Run comprobadas el 2026-11-09; con eso se cierra el hito 4 (etiqueta `hito-4`). Google One Tap añadido el 2026-11-17 (D-34, etiqueta `hito-13`). |
